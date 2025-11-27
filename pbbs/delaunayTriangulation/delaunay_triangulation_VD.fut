@@ -24,7 +24,7 @@ def log2Int (n : i64) : i64 =
         (n >> 1, r+1)
   in res 
 
-type QorA = #left     | #right   | #up       | #down      |
+type QorA = #left     | #right   | #up       | #down      | #center |
            #leftUp   | #rightUp | #leftDown | #rightDown
 
 def findQuodrantOrAxis (p : (i64, i64)) (q : (i64, i64)) (grid_size : i64) : QorA =
@@ -34,13 +34,15 @@ def findQuodrantOrAxis (p : (i64, i64)) (q : (i64, i64)) (grid_size : i64) : Qor
         if      dir_x == 0 && dir_y > 0 then #up
         else if dir_x == 0 && dir_y < 0 then #down
         else if dir_x < 0 && dir_y == 0 then #left
-        else #right
+        else if dir_x > 0 && dir_y == 0 then #right
+        else #center
     else 
         if      dir_x > 0 && dir_y > 0 then #rightUp
         else if dir_x < 0 && dir_y > 0 then #leftUp
         else if dir_x < 0 && dir_y < 0 then #leftDown
         else #rightDown
 
+def checkQuadrant (p : i32) (q1 : i32) (q2 : i32) (q3: i32) = p == q1 || p == q2 || p == q3
 
 
 def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, [n]i32) =
@@ -121,19 +123,42 @@ def voronoiDiagram [grid_size] (grid : [grid_size][grid_size]i32) : ([grid_size]
 def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64))) : [grid_size][grid_size](f32, i32, (i64, i64))=
     --SPØRGSMÅL: Når man berenger det tæteste point til en island pixel, skal man så finde den mindste distance blandt all points
     --           eller kun blandt dens naboer? Og skal man gå ud fra de 'transformerede' grid koordinater eller input koordinater 
+    let stencil_1 = stencilK 1
     let (g'', _) = 
         loop (g, cond) = (grid, true) while cond do 
             let g'' = tabulate_2d grid_size grid_size 
                 (\r c ->
-                    let rule = trace <| findQuodrantOrAxis (r,c) g[r][c].2 grid_size
-                    let t31  = trace <| (r,c)
-                    let t31  = trace <| g[r][c].2
+                    let rule = findQuodrantOrAxis (r,c) g[r][c].2 grid_size
+                    let t31  = (r,c)
+                    let t31  = g[r][c].2
                     let tmp = 
-                        if      rule == #up    && g[r-1][c].1 == g[r][c].1 then g[r][c]
+                        if      rule == #center then g[r][c]
+                        else if rule == #up    && g[r-1][c].1 == g[r][c].1 then g[r][c]
                         else if rule == #down  && g[r+1][c].1 == g[r][c].1 then g[r][c]
                         else if rule == #right && g[r][c+1].1 == g[r][c].1 then g[r][c]
                         else if rule == #left  && g[r][c-1].1 == g[r][c].1 then g[r][c]
-                        else (-1, -1, (-1,-1)) --Find new site to associate pixel with
+                        else if rule == #leftUp    && (checkQuadrant g[r][c].1 g[r-1][c-1].1 g[r-1][c].1 g[r][c-1].1) then g[r][c]
+                        else if rule == #leftDown  && (checkQuadrant g[r][c].1 g[r+1][c-1].1 g[r+1][c].1 g[r][c-1].1) then g[r][c]
+                        else if rule == #rightUp && (checkQuadrant g[r][c].1 g[r-1][c+1].1 g[r-1][c].1 g[r][c+1].1) then g[r][c]
+                        else if rule == #rightDown  && (checkQuadrant g[r][c].1 g[r+1][c+1].1 g[r+1][c].1 g[r][c+1].1) then g[r][c]
+
+                        --Find new site to associate pixel with
+                        else 
+                            let t33 = trace (rule, r,c, g[r][c])
+                            in loop (d, ind, (o_r, o_c)) =  (f32.highest, -1, (-1,-1)) for (i,j) in stencil_1 do
+                                let (r', c') = (r + i, c + j)
+                                in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
+                                    (d, ind, (o_r, o_c))
+                                else 
+                                    let ind' = g[r'][c'].1
+                                    in if ind' != -1  then
+                                        let d' = dist (f32.i64 c,f32.i64 r) (f32.i64 g[r'][c'].2.1, f32.i64 g[r'][c'].2.0)
+                                        in if d' < d then
+                                            (d', ind', g[r'][c'].2)
+                                        else
+                                            (d, ind, (o_r, o_c))      
+                                    else
+                                        (d, ind, (o_r, o_c))
                     in tmp
 
 
@@ -149,14 +174,15 @@ def main [n]
     let (grid, unused_p_flag) = movePointsToGrid points grid_size
     let (t4, t10) = trace (grid, unused_p_flag)
 
-    let grid =  voronoiDiagram grid
-    let test_grid = map (\i -> map (\j -> grid[i][j].1) <| iota grid_size) <| iota grid_size 
+    let grid' =  voronoiDiagram grid
+    let test_grid = map (\i -> map (\j -> grid'[i][j].1) <| iota grid_size) <| iota grid_size 
     let t24 = trace test_grid
 
 
 
 
-    in removeIslands grid
+    let grid'' = removeIslands grid'
+    in unused_p_flag
 -- In:
 -- trace: ([[-1, -1, -1, -1, -1, -1, -1, -1],
 --          [ 1, -1, -1, -1, -1, -1, -1, -1],
