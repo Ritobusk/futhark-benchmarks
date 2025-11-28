@@ -62,6 +62,7 @@ def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][g
     let scaled_points = map (\cc -> map (\c -> c * scale) cc) pointsT |> transpose
 
     -- Need to think about this some more. Currently it is sequential with updates to an array.
+    -- https://futhark-lang.org/examples/removing-duplicates.html   !
     in loop (grid' : *[grid_size][grid_size]i32, u_p_f : *[n]i32) = (grid, replicate (n) 0i32) for i < n do 
         let (x, y) = ( f32.round (scaled_points[i][0] + half_grid_size), f32.round (scaled_points[i][1] + half_grid_size))
         let (x, y) = (i64.f32 <| x, i64.f32 <| y )
@@ -180,21 +181,13 @@ def main [n]
 
     let grid'' = removeIslands grid'
     in unused_p_flag
--- In:
--- trace: ([[-1, -1, -1, -1, -1, -1, -1, -1],
---          [ 1, -1, -1, -1, -1, -1, -1, -1],
---          [-1, -1, -1,  0, -1,  8, -1, -1],
---          [-1, -1, -1,  4, -1,  2,  7, -1],
---          [-1, -1,  5, -1, -1,  9, -1, -1],
---          [-1, -1, -1, -1, -1, -1, -1, -1],
---          [-1,  3, -1, -1, -1, -1, -1, -1],
---          [-1, -1, -1, -1, -1, -1,  6, -1]],
---Result:
--- trace: [[1, 1, 0, 0, 8, 8, 8, 8],
---         [1, 1, 0, 0, 8, 8, 8, 7],
---         [1, 1, 0, 0, 8, 8, 7, 7],
---         [1, 5, 5, 4, 2, 2, 7, 7],
---         [5, 5, 5, 5, 9, 9, 9, 7],
---         [3, 3, 5, 5, 9, 9, 9, 6],
---         [3, 3, 3, 3, 6, 6, 6, 6],
---         [3, 3, 3, 3, 6, 6, 6, 6]]
+
+
+-- Comments
+-- Brug https://futhark-lang.org/examples/removing-duplicates.html   til at få G1 til at være parallel
+-- Brug https://futhark-lang.org/examples/literate-basics.html       til at visualiserer gridet
+-- Overvej om griddet har brug for de 3 tupler, som bliver lavet i G2 eller om man kan nøjes med kun idx
+--    fremfor både idx og org_coords. Man kan nemlig bruge idx til at læse fra et n-langt array med org_coords
+--    Vent til at jeg er sidst i processen til at se om det giver en lille speedup eller ej.
+
+
