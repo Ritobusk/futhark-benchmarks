@@ -76,8 +76,6 @@ def voronoiDiagram [grid_size] (grid : [grid_size][grid_size]i32) : ([grid_size]
     -- I use a tuple grid to represent for each pixel both the distance to the closest encountered site, 
     --   this site's index and the coordinates to the original site which is now referenced
     --   by the specific pixel: (dist, site_index, org_coords)
-    -- !! The site index is redundant since you can just read it from the plus_1 grid with the 
-    --      coordinates that refrences it.
     let stencil_1 = stencilK 1
     let plus_1 = tabulate_2d grid_size grid_size 
         (\r c ->
@@ -126,49 +124,48 @@ def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64
     let stencil_1 = stencilK 1
     let (g'', _) = 
         loop (g, cond) = (grid, true) while cond do 
-            let g'' = tabulate_2d grid_size grid_size 
+            let (g'', island_flag_array) =  unzip <| flatten <| tabulate_2d grid_size grid_size 
                 (\r c ->
                     let rule = findQuodrantOrAxis (r,c) g[r][c].2 grid_size
-                    let t31  = (r,c)
-                    let t31  = g[r][c].2
                     let tmp = 
-                        if      rule == #center then g[r][c]
-                        else if rule == #up    && g[r-1][c].1 == g[r][c].1 then g[r][c]
-                        else if rule == #down  && g[r+1][c].1 == g[r][c].1 then g[r][c]
-                        else if rule == #right && g[r][c+1].1 == g[r][c].1 then g[r][c]
-                        else if rule == #left  && g[r][c-1].1 == g[r][c].1 then g[r][c]
-                        else if rule == #leftUp    && (checkQuadrant g[r][c].1 g[r-1][c-1].1 g[r-1][c].1 g[r][c-1].1) then g[r][c]
-                        else if rule == #leftDown  && (checkQuadrant g[r][c].1 g[r+1][c-1].1 g[r+1][c].1 g[r][c-1].1) then g[r][c]
-                        else if rule == #rightUp && (checkQuadrant g[r][c].1 g[r-1][c+1].1 g[r-1][c].1 g[r][c+1].1) then g[r][c]
-                        else if rule == #rightDown  && (checkQuadrant g[r][c].1 g[r+1][c+1].1 g[r+1][c].1 g[r][c+1].1) then g[r][c]
+                        if      rule == #center then (g[r][c], false)
+                        else if rule == #up    && g[r-1][c].1 == g[r][c].1 then (g[r][c], false)
+                        else if rule == #down  && g[r+1][c].1 == g[r][c].1 then (g[r][c], false)
+                        else if rule == #right && g[r][c+1].1 == g[r][c].1 then (g[r][c], false)
+                        else if rule == #left  && g[r][c-1].1 == g[r][c].1 then (g[r][c], false)
+                        else if rule == #leftUp    && (checkQuadrant g[r][c].1 g[r-1][c-1].1 g[r-1][c].1 g[r][c-1].1) then (g[r][c], false)
+                        else if rule == #leftDown  && (checkQuadrant g[r][c].1 g[r+1][c-1].1 g[r+1][c].1 g[r][c-1].1) then (g[r][c], false)
+                        else if rule == #rightUp && (checkQuadrant g[r][c].1 g[r-1][c+1].1 g[r-1][c].1 g[r][c+1].1) then (g[r][c], false)
+                        else if rule == #rightDown  && (checkQuadrant g[r][c].1 g[r+1][c+1].1 g[r+1][c].1 g[r][c+1].1) then (g[r][c], false)
 
                         --Find new site to associate pixel with
                         else 
                             let t33 = trace (rule, r,c, g[r][c])
-                            in loop (d, ind, (o_r, o_c)) =  (f32.highest, -1, (-1,-1)) for (i,j) in stencil_1 do
+                            in loop ((d, ind, (o_r, o_c)), island_flag) =  ((f32.highest, -1, (-1,-1)), true) for (i,j) in stencil_1 do
                                 let (r', c') = (r + i, c + j)
                                 in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
-                                    (d, ind, (o_r, o_c))
+                                    ((d, ind, (o_r, o_c)), island_flag)
                                 else 
                                     let ind' = g[r'][c'].1
                                     in if ind' != -1  then
                                         let d' = dist (f32.i64 c,f32.i64 r) (f32.i64 g[r'][c'].2.1, f32.i64 g[r'][c'].2.0)
                                         in if d' < d then
-                                            (d', ind', g[r'][c'].2)
+                                            ((d', ind', g[r'][c'].2), island_flag)
                                         else
-                                            (d, ind, (o_r, o_c))      
+                                            ((d, ind, (o_r, o_c)), island_flag)
                                     else
-                                        (d, ind, (o_r, o_c))
+                                        ((d, ind, (o_r, o_c)), island_flag)
                     in tmp
-
-
                 )
-            in (g, false)
+            -- Check if any islands where found. If so we loop again!
+            let cond' = trace <| reduce (\acc f -> f) false (island_flag_array)
+            in (unflatten g'', cond')
     in g''
 
 
 def main [n]
     (points : [n][2]f32)  =
+    -- grid is: total_grid_size <= 18n, i.e. O(n)
     let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
 
     let (grid, unused_p_flag) = movePointsToGrid points grid_size
