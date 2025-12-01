@@ -1,49 +1,7 @@
 --  futhark run delaunay_triangulation_VD.fut < test_data.txt
 --  futhark dataset -g 5i32 -g [10][2]f32 > test_data.txt
 
-
---Shifts points' center towards (0,0)
-def shiftPoints [n][d]
-         (points : [n][d]f32) : [n][d]f32  =
-     let mass_acc       = replicate (d) 0.0f32
-     let mass_sum       = reduce (\acc point -> map2 (+) acc point ) mass_acc points
-     let mass           = map (\i -> i / f32.i64 n) mass_sum
-     let shifted_Points = map (\point -> map2 (\pv mv -> pv - mv) point mass) points
-     in shifted_Points
-
-def dist (p : (f32, f32)) (q: (f32, f32)) =
-    f32.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
-
-def stencilK (k : i64) =
-    [(k,0), (k,k),(k,-k),(0,k),(0,-k),(-k,0),(-k,k),(-k,-k)]
-
-def log2Int (n : i64) : i64 =
-  let (_, res) =
-    loop (n, r) = (n, 0)
-      while n > 1 do
-        (n >> 1, r+1)
-  in res 
-
-type QorA = #left     | #right   | #up       | #down      | #center |
-           #leftUp   | #rightUp | #leftDown | #rightDown
-
-def findQuodrantOrAxis (p : (i64, i64)) (q : (i64, i64)) (grid_size : i64) : QorA =
-    -- The input coordinates of a point will be (y,x) since its the row/col from the grid
-    let (dir_x, dir_y) = ((f64.i64 q.1) - (f64.i64 p.1) ,(f64.i64 (grid_size - q.0)) - (f64.i64 (grid_size -p.0)))
-    in if dir_x == 0 || dir_y == 0 then
-        if      dir_x == 0 && dir_y > 0 then #up
-        else if dir_x == 0 && dir_y < 0 then #down
-        else if dir_x < 0 && dir_y == 0 then #left
-        else if dir_x > 0 && dir_y == 0 then #right
-        else #center
-    else 
-        if      dir_x > 0 && dir_y > 0 then #rightUp
-        else if dir_x < 0 && dir_y > 0 then #leftUp
-        else if dir_x < 0 && dir_y < 0 then #leftDown
-        else #rightDown
-
-def checkQuadrant (p : i32) (q1 : i32) (q2 : i32) (q3: i32) = p == q1 || p == q2 || p == q3
-
+import "util"
 
 def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, [n]i32) =
     -- G1: Moves points to a grid by translating the points such that 0,0 is the center of mass and scaling the points
@@ -163,6 +121,14 @@ def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64
             in (unflatten g'', cond')
     in g''
 
+def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) = --: [m](i64, i64) =
+    tabulate_2d (grid_size - 2) (grid_size - 2) 
+        ( \r c ->
+            let is_corner = classifyVertex grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
+            in is_corner
+        )
+
+-- > :img main ($loaddata "test_data.txt")
 
 def main [n]
     (points : [n][2]f32)  =
@@ -173,17 +139,16 @@ def main [n]
     let (t4, t10) = trace (grid, unused_p_flag)
 
     let grid' =  voronoiDiagram grid
-    let test_grid = map (\i -> map (\j -> grid'[i][j].1) <| iota grid_size) <| iota grid_size 
-    let t24 = trace test_grid
-
-
-
+    let test_grid = trace <| map (\i -> map (\j -> grid'[i][j].1) <| iota grid_size) <| iota grid_size 
+    let test_grid' = trace <| map (\i -> map (\j -> f32.i32 grid'[i][j].1) <| iota grid_size) <| iota grid_size 
+    let t24 = trace <| locateVoronoiVertices test_grid
 
     let grid'' = removeIslands grid'
-    in unused_p_flag
+    in test_grid
 
 
 -- Comments
+-- grid_size burde måske ikke afhænge af 'n', da det kan gøre noget ved den asymptotiske køretid.
 -- Brug https://futhark-lang.org/examples/removing-duplicates.html   til at få G1 til at være parallel
 -- Brug https://futhark-lang.org/examples/literate-basics.html       til at visualiserer gridet
 -- Overvej om griddet har brug for de 3 tupler, som bliver lavet i G2 eller om man kan nøjes med kun idx
