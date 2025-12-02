@@ -131,6 +131,18 @@ def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid
                 in is_corner
         )
 
+-- G5:
+-- sgmscan + (replicate grid_size 1)  voronoi_vertices
+-- Another sgmscan on an empty grid to read the last entry of each segment
+
+--G5 - G6
+-- kan man ikke bare gøre alt dette i G4?
+--  Når intet findes returnerer man (0, (-1,-1,-1))
+--  Når en 3'er findes returnerer man (1, (c1,c2,c3))
+--  Når en 4'er findes returnerer man (2, (c1,c2,c3,c4))
+-- Og til sidst en filter der fjerner, dem der ikke er trekanter. 
+
+
 -- > :img main ($loaddata "test_data.txt")
 -- gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
 -- let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) --(i32.i64 <| n-1)
