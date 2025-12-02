@@ -47,4 +47,14 @@ def classifyVertex (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : bool =
     else false
 
 
+def gridToGray [m] (grid : [m][m]i32) (max_idx : i64) : [m][m]f32  =
+     tabulate_2d m m (\i j -> (f32.i32 grid[i][j]) / (f32.i64 max_idx))
 
+def colours [m] (grid : [m][m]i32) : [m][m]u32 =
+    let f (x) =
+        let x = x**2
+        in
+            (u32.i32 (x*3) & 0xFF) << 16 |
+            (u32.i32 (x+127) & 0xFF) << 8 |
+            (u32.f64 (f64.cos (f64.i32 x) -f64.sin 3) & 0xFF)
+    in map (map f) (grid)

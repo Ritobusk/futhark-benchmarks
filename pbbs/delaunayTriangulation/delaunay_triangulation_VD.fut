@@ -121,14 +121,19 @@ def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64
             in (unflatten g'', cond')
     in g''
 
-def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) = --: [m](i64, i64) =
-    tabulate_2d (grid_size - 2) (grid_size - 2) 
+def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]bool = --: [m](i64, i64) =
+    -- tabulate_2d (grid_size - 2) (grid_size - 2) 
+    tabulate_2d (grid_size ) (grid_size) 
         ( \r c ->
-            let is_corner = classifyVertex grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
-            in is_corner
+            if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then false
+            else
+                let is_corner = classifyVertex grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
+                in is_corner
         )
 
 -- > :img main ($loaddata "test_data.txt")
+-- gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
+-- let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) --(i32.i64 <| n-1)
 
 def main [n]
     (points : [n][2]f32)  =
@@ -140,11 +145,12 @@ def main [n]
 
     let grid' =  voronoiDiagram grid
     let test_grid = trace <| map (\i -> map (\j -> grid'[i][j].1) <| iota grid_size) <| iota grid_size 
-    let test_grid' = trace <| map (\i -> map (\j -> f32.i32 grid'[i][j].1) <| iota grid_size) <| iota grid_size 
-    let t24 = trace <| locateVoronoiVertices test_grid
+    let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) --(i32.i64 <| n-1)
+    let voronoi_vertices = trace <| locateVoronoiVertices test_grid
 
     let grid'' = removeIslands grid'
-    in test_grid
+
+    in gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
 
 
 -- Comments
