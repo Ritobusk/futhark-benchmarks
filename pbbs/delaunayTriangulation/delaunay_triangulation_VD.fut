@@ -99,6 +99,7 @@ def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64
 
                         --Find new site to associate pixel with
                         else 
+                            -- Find the closest point among the neighbours
                             let t33 = trace (rule, r,c, g[r][c])
                             in loop ((d, ind, (o_r, o_c)), island_flag) =  ((f32.highest, -1, (-1,-1)), true) for (i,j) in stencil_1 do
                                 let (r', c') = (r + i, c + j)
@@ -121,18 +122,29 @@ def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64
             in (unflatten g'', cond')
     in g''
 
-def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]bool = --: [m](i64, i64) =
+def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]i32 = --: [m](i64, i64) =
     -- tabulate_2d (grid_size - 2) (grid_size - 2) 
     tabulate_2d (grid_size ) (grid_size) 
         ( \r c ->
-            if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then false
+            if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then 0
             else
-                let is_corner = classifyVertex grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
+                let is_corner = classifyVertexI32 grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
                 in is_corner
         )
 
+def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]((i32, i32, i32),(i32, i32, i32)) = --: [m](i64, i64) =
+    -- tabulate_2d (grid_size - 2) (grid_size - 2) 
+    let trs =tabulate_2d (grid_size ) (grid_size) 
+        ( \r c ->
+            if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then ((-1,-1,-1),(-1,-1,-1))
+            else
+                
+                 classifyVertexAndTriangulation grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
+        )
+
+    -- let trs = filter  (\t -> t.0.0 > -1)  <| trs
+    in trs
 -- G5:
--- sgmscan + (replicate grid_size 1)  voronoi_vertices
 -- Another sgmscan on an empty grid to read the last entry of each segment
 
 --G5 - G6
@@ -141,6 +153,10 @@ def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid
 --  Når en 3'er findes returnerer man (1, (c1,c2,c3))
 --  Når en 4'er findes returnerer man (2, (c1,c2,c3,c4))
 -- Og til sidst en filter der fjerner, dem der ikke er trekanter. 
+
+-- 1. prøv scan så man får et array, hvor alle voronoiVertices er indexeret.
+-- 2. Derefter alloker et array til trekanterne
+-- 3. lav map og scatter til at tilføje trekanterne til 2.
 
 
 -- > :img main ($loaddata "test_data.txt")
@@ -159,10 +175,27 @@ def main [n]
     let test_grid = trace <| map (\i -> map (\j -> grid'[i][j].1) <| iota grid_size) <| iota grid_size 
     let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) --(i32.i64 <| n-1)
     let voronoi_vertices = trace <| locateVoronoiVertices test_grid
+    let fvv = flatten voronoi_vertices
+    let fvv_ids = trace <| scan (+) 0i32 fvv
+    let num_ts = trace <| last fvv_ids
+    let num_ts' = i64.i32 <| num_ts *2
+    let triangles = replicate (num_ts') [-1, -1, -1] 
+    let vv_idxs = map (\x -> if x.1 > 0 then (x.0, x.2) else (-1, 0) ) <| zip3 fvv_ids fvv (indices fvv)
+    let vv_idxs' = filter (\x -> if x.0 < 0 then false else true) vv_idxs
+    let vv_idxs' = trace vv_idxs'
+    let a = trace <| map (\i -> 
+        let j = vv_idxs'[i/2].1
+        let c = j % grid_size
+        let r = j / grid_size 
+        let t = classifyVertexAndTriangulation test_grid[r][c+1] test_grid[r][c] test_grid[r+1][c] test_grid[r+1][c+1]
+        in if i%2==0 then t.1 else t.0
+
+        ) (iota num_ts')
+
 
     let grid'' = removeIslands grid'
 
-    in gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
+    in gridToGray (voronoi_vertices) (1)
 
 
 -- Comments

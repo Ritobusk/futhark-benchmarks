@@ -46,6 +46,23 @@ def classifyVertex (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : bool =
         else false
     else false
 
+def classifyVertexI32 (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : i32 =
+    if q1 != q3 && q2 != q4 then -- Diagonals are different
+        if (q1 != q2 || q4 != q3) && (q1 != q4 || q2 != q3) then 1 -- Atleast 1 row or column has unique values
+        else 0
+    else 0
+
+-- Returns triangles in clockwise order    
+def classifyVertexAndTriangulation (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : ((i32, i32, i32),(i32, i32, i32)) = --: ((), ()) =
+    if q1 != q3 && q2 != q4 then -- Diagonals are different
+        if q1 != q2 && q1 != q4 && q2 != q3 && q4 != q3   then ((q2, q1, q4), (q4, q3, q2)) -- All are unique
+        else if (q1 != q2 || q4 != q3) && (q1 != q4 || q2 != q3) then -- Atleast 1 row or column has unique values
+            if q1 == q2 || q1 == q4 then ((q2, q4, q3), (-1, -1, -1))
+            else if q2 == q1 || q2 == q3 then ((q1, q4, q3), (-1, -1, -1))
+            else if q3 == q2 || q3 == q4 then ((q2, q1, q4), (-1, -1, -1))
+            else ((q3, q2, q1), (-1, -1, -1))
+        else ((-1, -1, -1), (-1, -1, -1))
+    else ((-1, -1, -1), (-1, -1, -1))
 
 def gridToGray [m] (grid : [m][m]i32) (max_idx : i64) : [m][m]f32  =
      tabulate_2d m m (\i j -> (f32.i32 grid[i][j]) / (f32.i64 max_idx))
