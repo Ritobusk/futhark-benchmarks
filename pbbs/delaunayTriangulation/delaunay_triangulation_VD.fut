@@ -2,8 +2,9 @@
 --  futhark dataset -g 5i32 -g [10][2]f32 > test_data.txt
 
 import "util"
+import "lib/github.com/diku-dk/sorts/radix_sort"
 
-def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, [n]i32) =
+def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, *[]i32) =
     -- G1: Moves points to a grid by translating the points such that 0,0 is the center of mass and scaling the points
     --     If a 2 points fit in the same place in the grid, only one of them is inserted.
     let grid      = replicate grid_size (replicate grid_size (-1i32))
@@ -13,21 +14,31 @@ def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][g
     let mins = map (reduce_comm f32.min f32.highest) pointsT
     let maxs = map (reduce_comm f32.max f32.lowest ) pointsT 
 
-    let half_grid_size =  ((f32.i64 (grid_size -1) / 2f32) )
+    let half_grid_size =  (f32.i64 (grid_size -1) / 2f32) 
     let x_scale = (half_grid_size / (f32.max (f32.abs mins[0]) (f32.abs maxs[0])))
     let y_scale = (half_grid_size / (f32.max (f32.abs mins[1]) (f32.abs maxs[1])))
     let scale   = f32.min x_scale y_scale 
-    let scaled_points = map (\cc -> map (\c -> c * scale) cc) pointsT |> transpose
 
-    -- Need to think about this some more. Currently it is sequential with updates to an array.
-    -- https://futhark-lang.org/examples/removing-duplicates.html   !
-    in loop (grid' : *[grid_size][grid_size]i32, u_p_f : *[n]i32) = (grid, replicate (n) 0i32) for i < n do 
-        let (x, y) = ( f32.round (scaled_points[i][0] + half_grid_size), f32.round (scaled_points[i][1] + half_grid_size))
-        let (x, y) = (i64.f32 <| x, i64.f32 <| y )
-        in if grid'[y][x] == (-1) then
-            (grid' with [y,x] = (i32.i64 i), u_p_f)
-           else
-            (grid', u_p_f with [i] = i32.i64 1)
+    let scaled_points = map (\cc -> map (\c -> i64.f32 <| f32.round <| c * scale + half_grid_size) cc) pointsT |> transpose
+    let scaled_points_flat_idx = map (\cc -> 
+        let x = (i64.f32 <| f32.round <| cc[0] * scale + half_grid_size)   
+        let y = grid_size * (i64.f32 <| f32.round <| cc[1] * scale + half_grid_size)
+        in x + y
+    ) <| transpose pointsT
+    let scaled_points_flat_idx = scaled_points_flat_idx ++ [99]
+    -- Jeg forstår ikke radix sort...
+    let sorted_ids = radix_sort_int_by_key (\k -> k.0) (i32.i64 <| log2Int (grid_size**2)) i64.get_bit (zip scaled_points_flat_idx (iota (n+1)))
+    let t11 = trace <| scaled_points_flat_idx
+    let t14 = trace <| sorted_ids
+    let (used, unused) = pack_points sorted_ids
+
+    let t15 = trace <| used
+    let t16 = trace <| unused
+
+    let grid =
+        scatter (flatten grid) (map (.0) used) (map (\x -> i32.i64 x.1) used)
+        |> unflatten
+    in (grid, (map (\x -> i32.i64 x.1) unused))
 
 
 def voronoiDiagram [grid_size] (grid : [grid_size][grid_size]i32) : ([grid_size][grid_size](f32, i32, (i64, i64))) =
@@ -166,7 +177,8 @@ def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][
 def main [n]
     (points : [n][2]f32)  =
     -- grid is: total_grid_size <= 18n, i.e. O(n)
-    let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
+    -- let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
+    let grid_size = 16
 
     let (grid, unused_p_flag) = movePointsToGrid points grid_size
     let (t4, t10) = trace (grid, unused_p_flag)
@@ -183,7 +195,7 @@ def main [n]
     let vv_idxs = map (\x -> if x.1 > 0 then (x.0, x.2) else (-1, 0) ) <| zip3 fvv_ids fvv (indices fvv)
     let vv_idxs' = filter (\x -> if x.0 < 0 then false else true) vv_idxs
     let vv_idxs' = trace vv_idxs'
-    let a = trace <| map (\i -> 
+    let a =  filter (\x -> x.0 >= 0) <| map (\i -> 
         let j = vv_idxs'[i/2].1
         let c = j % grid_size
         let r = j / grid_size 
@@ -192,6 +204,7 @@ def main [n]
 
         ) (iota num_ts')
 
+    let t6 = trace <| a
 
     let grid'' = removeIslands grid'
 

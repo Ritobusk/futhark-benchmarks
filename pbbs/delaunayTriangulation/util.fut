@@ -7,6 +7,15 @@ def shiftPoints [n][d]
      let shifted_Points = map (\point -> map2 (\pv mv -> pv - mv) point mass) points
      in shifted_Points
 
+def neq lte x y = if x `lte` y then !(y `lte` x) else true
+
+def pack [n] lte (xs : [n](i64, i64)) =
+  let (used, unused) =zip3 (indices xs) xs (rotate (-1) xs)
+  |> partition (\(i,x,y) -> i == 0 || neq lte x.0 y.0) 
+  in (map (.1) used, map (.1) unused)
+
+def pack_points = pack (i64.<=)     
+
 def dist (p : (f32, f32)) (q: (f32, f32)) =
     f32.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
 
