@@ -7,6 +7,7 @@ def shiftPoints [n][d]
      let shifted_Points = map (\point -> map2 (\pv mv -> pv - mv) point mass) points
      in shifted_Points
 
+
 def neq lte x y = if x `lte` y then !(y `lte` x) else true
 
 def pack [n] lte (xs : [n](i64, i64)) =
@@ -15,6 +16,7 @@ def pack [n] lte (xs : [n](i64, i64)) =
   in (map (.1) used, map (.1) unused)
 
 def pack_points = pack (i64.<=)     
+
 
 def dist (p : (f32, f32)) (q: (f32, f32)) =
     f32.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
@@ -28,6 +30,7 @@ def log2Int (n : i64) : i64 =
       while n > 1 do
         (n >> 1, r+1)
   in res 
+
 
 type QorA = #left     | #right   | #up       | #down      | #center |
            #leftUp   | #rightUp | #leftDown | #rightDown
@@ -48,6 +51,7 @@ def findQuodrantOrAxis (p : (i64, i64)) (q : (i64, i64)) (grid_size : i64) : Qor
         else #rightDown
 
 def checkQuadrant (p : i32) (q1 : i32) (q2 : i32) (q3: i32) = p == q1 || p == q2 || p == q3
+
 
 def classifyVertex (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : bool =
     if q1 != q3 && q2 != q4 then -- Diagonals are different

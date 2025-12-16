@@ -184,39 +184,46 @@ def main [n]
     let (t4, t10) = trace (grid, unused_p_flag)
 
     let grid' =  voronoiDiagram grid
+    let grid' = removeIslands grid'
     let test_grid = trace <| map (\i -> map (\j -> grid'[i][j].1) <| iota grid_size) <| iota grid_size 
     let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) --(i32.i64 <| n-1)
     let voronoi_vertices = trace <| locateVoronoiVertices test_grid
+
+    -- G5 and G6
     let fvv = flatten voronoi_vertices
-    let fvv_ids = trace <| scan (+) 0i32 fvv
-    let num_ts = trace <| last fvv_ids
-    let num_ts' = i64.i32 <| num_ts *2
-    let triangles = replicate (num_ts') [-1, -1, -1] 
+    let fvv_ids = scan (+) 0i32 fvv
     let vv_idxs = map (\x -> if x.1 > 0 then (x.0, x.2) else (-1, 0) ) <| zip3 fvv_ids fvv (indices fvv)
     let vv_idxs' = filter (\x -> if x.0 < 0 then false else true) vv_idxs
     let vv_idxs' = trace vv_idxs'
-    let a =  filter (\x -> x.0 >= 0) <| map (\i -> 
-        let j = vv_idxs'[i/2].1
-        let c = j % grid_size
-        let r = j / grid_size 
-        let t = classifyVertexAndTriangulation test_grid[r][c+1] test_grid[r][c] test_grid[r+1][c] test_grid[r+1][c+1]
-        in if i%2==0 then t.1 else t.0
-
-        ) (iota num_ts')
-
-    let t6 = trace <| a
-
-    let grid'' = removeIslands grid'
-
-    in gridToGray (voronoi_vertices) (1)
+    let num_ts   =  i64.i32 <| 2*(last fvv_ids)
+    let triangles =  filter (\x -> x.0 >= 0) 
+        <| map (\i -> 
+            let j = vv_idxs'[i/2].1
+            let c = j % grid_size
+            let r = j / grid_size 
+            let t = classifyVertexAndTriangulation test_grid[r][c+1] test_grid[r][c] test_grid[r+1][c] test_grid[r+1][c+1]
+            in if i%2==0 then t.1 else t.0
+        ) (iota num_ts)
 
 
--- Comments
+
+
+    in triangles
+
+
+-- Comments/ToDo
+-- Jeg er kommet til at lave trekant punkterne clockwise,
 -- grid_size burde måske ikke afhænge af 'n', da det kan gøre noget ved den asymptotiske køretid.
--- Brug https://futhark-lang.org/examples/removing-duplicates.html   til at få G1 til at være parallel
 -- Brug https://futhark-lang.org/examples/literate-basics.html       til at visualiserer gridet
 -- Overvej om griddet har brug for de 3 tupler, som bliver lavet i G2 eller om man kan nøjes med kun idx
 --    fremfor både idx og org_coords. Man kan nemlig bruge idx til at læse fra et n-langt array med org_coords
 --    Vent til at jeg er sidst i processen til at se om det giver en lille speedup eller ej.
 
+
+-- C1: Man kan map |> removeDuplicates, for at få boundry (Skal være i original order.) 
+--     Muligvis ikke muligt at tjekke parallelt. I figur 5 se mørkegrøn, grå, lysegrøn.
+
+-- C2: Det ligner jeg for hvert site også burde holde styr på dens edges. Ellers skal jeg søge efter alle trekanter, der indeholder et site.
+
+-- C3: I G1 burde jeg returnerer et par af de unused, så man kan referere det ubrugte site til det brugte. 
 
