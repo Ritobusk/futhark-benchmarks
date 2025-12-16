@@ -139,11 +139,12 @@ def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid
 -- kan man ikke bare gøre alt dette i G4?
 --  Når intet findes returnerer man (0, (-1,-1,-1))
 --  Når en 3'er findes returnerer man (1, (c1,c2,c3))
---  Når en 4'er findes returnerer man (2, (c1,c2,c3,c4))
+--  Når en 4'er findes returnerer man (2, (c1,c2,c3))
 -- Og til sidst en filter der fjerner, dem der ikke er trekanter. 
 
 
--- > :img main ($loaddata "test_data.txt")
+-- > :img main ($loaddata "test_data3.txt")
+
 -- gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
 -- let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) --(i32.i64 <| n-1)
 
@@ -151,6 +152,7 @@ def main [n]
     (points : [n][2]f32)  =
     -- grid is: total_grid_size <= 18n, i.e. O(n)
     let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
+    let grid_size = 500
 
     let (grid, unused_p_flag) = movePointsToGrid points grid_size
     let (t4, t10) = trace (grid, unused_p_flag)
@@ -162,7 +164,8 @@ def main [n]
 
     let grid'' = removeIslands grid'
 
-    in gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
+    in test_grid' 
+    --gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
 
 
 -- Comments
