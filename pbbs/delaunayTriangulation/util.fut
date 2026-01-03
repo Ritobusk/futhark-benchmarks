@@ -18,8 +18,18 @@ def pack [n] lte (xs : [n](i64, i64)) =
 def pack_points = pack (i64.<=)     
 
 
-def dist (p : (f32, f32)) (q: (f32, f32)) =
+def dist (p : (f32, f32)) (q: (f32, f32)) : f32 =
     f32.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
+
+def disti64 (p : (i64, i64)) (q: (i64, i64)) : f32 =
+    let p = (f32.i64 p.0, f32.i64 p.1)
+    let q = (f32.i64 q.0, f32.i64 q.1)
+    in f32.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
+
+def normalizei64 (p : (i64,i64)) : (f32, f32) =
+    let p = (f32.i64 p.0, f32.i64 p.1)
+    let mag = f32.sqrt (p.0**2 + p.1**2)
+    in (p.0/mag, p.1/mag)
 
 def stencilK (k : i64) =
     [(k,0), (k,k),(k,-k),(0,k),(0,-k),(-k,0),(-k,k),(-k,-k)]
@@ -66,7 +76,7 @@ def classifyVertexI32 (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : i32 =
     else 0
 
 -- Returns triangles in clockwise order    
-def classifyVertexAndTriangulation (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : ((i32, i32, i32),(i32, i32, i32)) = --: ((), ()) =
+def classifyVertexAndTriangulation (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : ((i32, i32, i32),(i32, i32, i32)) = 
     if q1 != q3 && q2 != q4 then -- Diagonals are different
         if q1 != q2 && q1 != q4 && q2 != q3 && q4 != q3   then ((q2, q1, q4), (q4, q3, q2)) -- All are unique
         else if (q1 != q2 || q4 != q3) && (q1 != q4 || q2 != q3) then -- Atleast 1 row or column has unique values
@@ -88,3 +98,46 @@ def colours [m] (grid : [m][m]i32) : [m][m]u32 =
             (u32.i32 (x+127) & 0xFF) << 8 |
             (u32.f64 (f64.cos (f64.i32 x) -f64.sin 3) & 0xFF)
     in map (map f) (grid)
+    
+def triangleGrid [m] [k] [n] (grid : [m][m]i32) (voronoi_diagram : [m][m]i32) (triangles : [k](i32, i32, i32)) (points : [n][2]i64) = -- : [m][m]u32 =
+    let colour_grid = colours voronoi_diagram
+    let line_mask = loop (g) = (replicate m (replicate m 0)) for t in triangles do
+            let (p1, p2, p3) = (points[t.0], points[t.1], points[t.2])
+            let dir1 = normalizei64 (p2[0] - p1[0], p2[1] - p1[1])
+            let dir2 = normalizei64 (p3[0] - p2[0], p3[1] - p2[1])
+            let dir3 = normalizei64 (p1[0] - p3[0], p1[1] - p3[1])
+
+            let dist1 = disti64 (p1[0], p1[1]) (p2[0], p2[1])
+            let dist2 = disti64 (p2[0], p2[1]) (p3[0], p3[1])
+            let dist3 = disti64 (p3[0], p3[1]) (p1[0], p1[1])
+
+            let l1 = map (\i -> 
+                let x = ((i64.f32 ((f32.i64 i) * dir1.0)) + p1[0])
+                let y = ((i64.f32 ((f32.i64 i) * dir1.1)) + p1[1])
+                in (y, x)
+                ) <| iota (i64.f32 dist1) 
+            let l2 = map (\i -> 
+                let x = ((i64.f32 ((f32.i64 i) * dir2.0)) + p2[0])
+                let y = ((i64.f32 ((f32.i64 i) * dir2.1)) + p2[1])
+                in (y, x)
+                ) <| iota (i64.f32 dist2) 
+            let l3 = map (\i -> 
+                let x = ((i64.f32 ((f32.i64 i) * dir3.0)) + p3[0])
+                let y = ((i64.f32 ((f32.i64 i) * dir3.1)) + p3[1])
+                in (y, x)
+                ) <| iota (i64.f32 dist3) 
+
+            let lines = l1 ++ l2 ++ l3
+            in loop g' = g for x in lines do
+                g' with [x.0,x.1] = 1
+    in 
+        tabulate_2d m m
+            ( \r c ->
+                if grid[r][c] >= 0 then 0u32
+                else
+                    if line_mask[r][c] > 0 then
+                        u32.highest 
+                    else
+                        colour_grid[r][c]
+            )
+    
