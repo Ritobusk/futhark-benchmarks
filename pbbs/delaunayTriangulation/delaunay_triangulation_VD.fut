@@ -21,7 +21,7 @@ def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][g
 
     let scaled_points = map (\cc -> map (\c -> i64.f32 <| f32.round <| c * scale + half_grid_size) cc) <| transpose pointsT 
 
-    let scaled_points_flat_idx = trace <| map (\cc -> 
+    let scaled_points_flat_idx =  map (\cc -> 
         let x = (i64.f32 <| f32.round <| cc[0] * scale + half_grid_size)   
         let y = grid_size * (i64.f32 <| f32.round <| cc[1] * scale + half_grid_size)
         in x + y
@@ -33,8 +33,8 @@ def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][g
     -- let t14 = trace <| sorted_ids
     let (used, unused) = pack_points_i64 sorted_ids
 
-    let t15 = trace <| used
-    let t16 = trace <| unused
+    -- let t15 = trace <| used
+    -- let t16 = trace <| unused
 
     let grid =
         scatter (flatten grid) (map (.0) used) (map (\x -> i32.i64 x.1) used)
@@ -127,18 +127,24 @@ def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64
                     in tmp
                 )
             -- Check if any islands where found. If so we loop again!
-            let cond' = trace <| reduce (\acc f -> f) false (island_flag_array)
+            let cond' = trace <| reduce (\acc f -> f && acc) false (island_flag_array)
             in (unflatten g'', cond')
     in g''
 
-def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]i32 = --: [m](i64, i64) =
+def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size-2][grid_size-2]i32 = --: [m](i64, i64) =
     -- tabulate_2d (grid_size - 2) (grid_size - 2) 
-    tabulate_2d (grid_size ) (grid_size) 
+    -- tabulate_2d (grid_size ) (grid_size) 
+    --     ( \r c ->
+    --         if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then 0
+    --         else
+    --             let is_corner = classifyVertexI32 grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
+    --             in is_corner
+    --     )
+    tabulate_2d (grid_size -2) (grid_size-2) 
         ( \r c ->
-            if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then 0
-            else
-                let is_corner = classifyVertexI32 grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
-                in is_corner
+            let (r, c) = (r+1, c+1)
+            let is_corner = classifyVertexI32 grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
+            in is_corner
         )
 
 def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]((i32, i32, i32),(i32, i32, i32)) = --: [m](i64, i64) =
@@ -154,6 +160,27 @@ def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][
     -- let trs = filter  (\t -> t.0.0 > -1)  <| trs
     in trs
 
+def createTriangles [m] (voronoi_diagram : [m][m]i32) (voronoi_vertices : [m-2][m-2]i32) : [](i32, i32, i32) =
+    -- G5 and G6
+    let fvv = flatten voronoi_vertices
+    let fvv_ids = scan (+) 0i32 fvv
+    let vv_idxs = map (\x -> if x.1 > 0 then (x.0, x.2) else (-1, 0) ) <| zip3 fvv_ids fvv (indices fvv)
+    let vv_idxs' = filter (\x -> if x.0 < 0 then false else true) vv_idxs
+    let num_ts   =  i64.i32 <| 2*(last fvv_ids)
+    in  filter (\x -> x.0 >= 0) 
+        <| map (\i -> 
+            let j = vv_idxs'[i/2].1
+            -- Since I only calculate the voronoi vertices on a (grid_size -2) (grid_size -2) grid I need to adjust the indices a bit
+            let x = j / (m - 2)
+            let j = j + m + x*2 + 1
+
+            let c = j % m
+            let r = j / m 
+            let t = classifyVertexAndTriangulation voronoi_diagram[r][c+1] voronoi_diagram[r][c] voronoi_diagram[r+1][c] voronoi_diagram[r+1][c+1]
+            in if i%2==0 then t.1 else t.0
+        ) (iota num_ts)
+
+
 
 def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64) = -- [](i32,i32,i32)
     let edge = map (\i -> 
@@ -162,21 +189,22 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
         else if i < 3 * grid_size then grid[grid_size -1][grid_size - 1 - (i % grid_size)]
         else grid[grid_size - 1 - (i% grid_size)][0]
 
-        ) (iota (4 * grid_size)) |> trace
-    let tc2 = trace grid
+        ) (iota (4 * grid_size)) 
+    -- let tc2 = trace grid
     let edge = pack_points_i32 edge -- It might be slower to remove duplicates
     let (_, triangles) = 
         loop (stack, triangles) = ([], [])
             for x in edge do 
-                let stack = trace <| stack ++ [x]
+                let stack = stack ++ [x]
                 in if length stack < 3 then
                     (stack, triangles)
                 else if isClockwise points[stack[0]] points[stack[1]] points[stack[2]] grid_size then
                     (stack[1:], triangles)
                 else
-                    let tc1 = trace <| (stack[0], stack[2], stack[1])
-                    let tc1 = trace <| (points[stack[0]], points[stack[1]], points[stack[2]])
-                    in ([stack[0], stack[2]], triangles ++ [(stack[0], stack[2], stack[1])])
+                    -- let tc1 = (stack[0], stack[2], stack[1])
+                    -- let tc1 = (points[stack[0]], points[stack[1]], points[stack[2]])
+
+                    ([stack[0], stack[2]], triangles ++ [(stack[0], stack[2], stack[1])])
                 
     in triangles
                 
@@ -198,46 +226,32 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
 
 -- > :img main ($loaddata "test_data.txt")
 
--- > :img main2 ($loaddata "test_data.txt")
+-- > :img main2 ($loaddata "test_data2.txt")
 
--- gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
--- let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) --(i32.i64 <| n-1)
 
 def main [n]
     (points : [n][2]f32)  =
     -- grid is: total_grid_size <= 18n, i.e. O(n)
     -- let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
-    let grid_size = 512
+    let grid_size = 512 -- 8192
 
     let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
     -- let (t4, t10) = trace (grid, unused_p_flag)
-    let t10 = trace (grid, unused_p_flag)
+    -- let t10 = trace (grid, unused_p_flag)
 
     let grid' = voronoiDiagram grid
     let grid''  = removeIslands grid'
-    let test_grid = tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1) 
-    let voronoi_vertices = locateVoronoiVertices test_grid 
+    let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid''[i][j].1) 
+    let voronoi_vertices = locateVoronoiVertices voronoi_diagram 
 
     -- G5 and G6
-    let fvv = flatten voronoi_vertices
-    let fvv_ids = scan (+) 0i32 fvv
-    let vv_idxs = map (\x -> if x.1 > 0 then (x.0, x.2) else (-1, 0) ) <| zip3 fvv_ids fvv (indices fvv)
-    let vv_idxs' = filter (\x -> if x.0 < 0 then false else true) vv_idxs
-    -- let vv_idxs' = trace vv_idxs'
-    let num_ts   =  i64.i32 <| 2*(last fvv_ids)
-    let triangles =  filter (\x -> x.0 >= 0) 
-        <| map (\i -> 
-            let j = vv_idxs'[i/2].1
-            let c = j % grid_size
-            let r = j / grid_size 
-            let t = classifyVertexAndTriangulation test_grid[r][c+1] test_grid[r][c] test_grid[r+1][c] test_grid[r+1][c+1]
-            in if i%2==0 then t.1 else t.0
-        ) (iota num_ts)
+    let triangles = createTriangles voronoi_diagram voronoi_vertices
 
-    let b = trace scaled_points
-    let triangles = (fixConvexHull test_grid scaled_points) ++ triangles
+    -- let b = trace scaled_points
+    let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
-    in triangleGrid grid test_grid triangles scaled_points
+    -- in length unused_p_flag
+    in triangleGrid grid voronoi_diagram triangles scaled_points
 
 def main2 [n]
     (points : [n][2]f32)  =
@@ -247,32 +261,19 @@ def main2 [n]
 
     let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
     -- let (t4, t10) = trace (grid, unused_p_flag)
-    let t10 = trace (unused_p_flag)
+    -- let t10 = trace (unused_p_flag)
 
     let grid' =  voronoiDiagram grid
     let grid' = removeIslands grid'
-    let test_grid = tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1) 
-    let voronoi_vertices = locateVoronoiVertices test_grid 
+    let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1) 
+    let voronoi_vertices = locateVoronoiVertices voronoi_diagram 
 
     -- G5 and G6
-    let fvv = flatten voronoi_vertices
-    let fvv_ids = scan (+) 0i32 fvv
-    let vv_idxs = map (\x -> if x.1 > 0 then (x.0, x.2) else (-1, 0) ) <| zip3 fvv_ids fvv (indices fvv)
-    let vv_idxs' = filter (\x -> if x.0 < 0 then false else true) vv_idxs
-    -- let vv_idxs' = trace vv_idxs'
-    let num_ts   =  i64.i32 <| 2*(last fvv_ids)
-    let triangles =  filter (\x -> x.0 >= 0) 
-        <| map (\i -> 
-            let j = vv_idxs'[i/2].1
-            let c = j % grid_size
-            let r = j / grid_size 
-            let t = classifyVertexAndTriangulation test_grid[r][c+1] test_grid[r][c] test_grid[r+1][c] test_grid[r+1][c+1]
-            in if i%2==0 then t.1 else t.0
-        ) (iota num_ts)
+    let triangles = createTriangles voronoi_diagram voronoi_vertices
 
-    let triangles = (fixConvexHull test_grid scaled_points) ++ triangles
+    let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
-    in triangleGrid grid test_grid triangles scaled_points
+    in triangleGrid grid voronoi_diagram triangles scaled_points
 
 -- Comments/ToDo
 -- grid_size burde måske ikke afhænge af 'n', da det kan gøre noget ved den asymptotiske køretid.
@@ -291,10 +292,50 @@ def main2 [n]
 --     Muligvis ikke muligt at tjekke parallelt. I figur 5 se mørkegrøn, grå, lysegrøn.
 
 -- C2: Det ligner jeg for hvert site også burde holde styr på dens edges. Ellers skal jeg søge efter alle trekanter, der indeholder et site.
+--     Muligvis kan dette ikke lade sig gøre, da triangulationen kan ændre sig. Det vil betyde at man skal recalculate, nogle af sitesnes 
+--      edges. Dette betyder, at hvis man vil have sitesne og deres 'fan' i et flat array, skal man for hver ændring recalculate size arrayet.
 
 -- For hver trekant lav (x, (x,y,z)), (y, (x,y,z)), (z, (x,y,z))
 -- derefter sorter efter første coordinat.
 -- Så kan man få en flad repræsentation. 
 
 -- C3: I G1 burde jeg returnerer et par af de unused, så man kan referere det ubrugte site til det brugte. 
-
+-- trace: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
+-- trace: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+--         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
+-- trace: [(1, 40), (2, 116), (3, 152), (4, 172), (5, 173), (6, 182), (7, 193), (8, 207), (9, 292)]

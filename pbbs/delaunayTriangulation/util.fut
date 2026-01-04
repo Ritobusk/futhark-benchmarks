@@ -67,23 +67,13 @@ def findQuodrantOrAxis (p : (i64, i64)) (q : (i64, i64)) (grid_size : i64) : Qor
 
 def checkQuadrant (p : i32) (q1 : i32) (q2 : i32) (q3: i32) = p == q1 || p == q2 || p == q3
 
-def crossProduct (p1 : [2]i64) (p2 : [2]i64) (grid_size : i64) =
-    trace <| p1[0] * ((grid_size ) - p2[1]) - ((grid_size ) - p1[1]) * p2[0]
-
 -- Sum over the area under the edges. If it is positive then it is clockwise.
--- Taken from https://stackoverflow.com/a/1165943
+-- Taken from  https://algs4.cs.princeton.edu/91primitives/
 def isClockwise (p1 : [2]i64) (p2 : [2]i64) (p3: [2]i64) (grid_size : i64) : bool =
     -- let t = trace (p1, p2, p3, grid_size)
     let (a, b) = ((p2[0] - p1[0]), ((grid_size - p2[1]) - (grid_size - p1[1])))
     let (c, d) = ((p3[0] - p1[0]), ((grid_size - p3[1]) - (grid_size - p1[1])))
     in b * c - a * d > 0
-    -- (crossProduct p1 p2 grid_size) +
-    -- (crossProduct p2 p3 grid_size) +
-    -- (crossProduct p3 p1 grid_size) < 0
-    -- ((p2[0] - p1[0]) * ((grid_size - p2[1]) + (grid_size - p1[1]))) + 
-    --     ((p3[0] - p2[0]) * ((grid_size - p3[1]) + (grid_size - p2[1]))) + 
-    --     ((p1[0] - p3[0]) * ((grid_size - p1[1]) + (grid_size - p3[1])))
-    --     >= 0
 
 def classifyVertex (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : bool =
     if q1 != q3 && q2 != q4 then -- Diagonals are different
@@ -109,9 +99,12 @@ def classifyVertexAndTriangulation (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) :
         else ((-1, -1, -1), (-1, -1, -1))
     else ((-1, -1, -1), (-1, -1, -1))
 
+
+-- gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
 def gridToGray [m] (grid : [m][m]i32) (max_idx : i64) : [m][m]f32  =
      tabulate_2d m m (\i j -> (f32.i32 grid[i][j]) / (f32.i64 max_idx))
 
+-- let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) 
 def colours [m] (grid : [m][m]i32) : [m][m]u32 =
     let f (x) =
         let x = x**2
