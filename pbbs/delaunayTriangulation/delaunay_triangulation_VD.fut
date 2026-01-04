@@ -178,7 +178,7 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
                     let tc1 = trace <| (points[stack[0]], points[stack[1]], points[stack[2]])
                     in ([stack[0], stack[2]], triangles ++ [(stack[0], stack[2], stack[1])])
                 
-    in triangles[1:]
+    in triangles
                 
 
                 
@@ -207,11 +207,11 @@ def main [n]
     (points : [n][2]f32)  =
     -- grid is: total_grid_size <= 18n, i.e. O(n)
     -- let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
-    let grid_size = 1000
+    let grid_size = 512
 
     let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
     -- let (t4, t10) = trace (grid, unused_p_flag)
-    let t10 = trace (unused_p_flag)
+    let t10 = trace (grid, unused_p_flag)
 
     let grid' = voronoiDiagram grid
     let grid''  = removeIslands grid'
@@ -235,7 +235,7 @@ def main [n]
         ) (iota num_ts)
 
     let b = trace scaled_points
-    -- let triangles = (fixConvexHull test_grid scaled_points) ++ triangles
+    let triangles = (fixConvexHull test_grid scaled_points) ++ triangles
 
     in triangleGrid grid test_grid triangles scaled_points
 
@@ -243,7 +243,7 @@ def main2 [n]
     (points : [n][2]f32)  =
     -- grid is: total_grid_size <= 18n, i.e. O(n)
     -- let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
-    let grid_size = 500
+    let grid_size = 512
 
     let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
     -- let (t4, t10) = trace (grid, unused_p_flag)

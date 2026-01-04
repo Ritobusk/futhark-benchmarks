@@ -73,10 +73,10 @@ def crossProduct (p1 : [2]i64) (p2 : [2]i64) (grid_size : i64) =
 -- Sum over the area under the edges. If it is positive then it is clockwise.
 -- Taken from https://stackoverflow.com/a/1165943
 def isClockwise (p1 : [2]i64) (p2 : [2]i64) (p3: [2]i64) (grid_size : i64) : bool =
-    let t = trace (p1, p2, p3)
+    -- let t = trace (p1, p2, p3, grid_size)
     let (a, b) = ((p2[0] - p1[0]), ((grid_size - p2[1]) - (grid_size - p1[1])))
     let (c, d) = ((p3[0] - p1[0]), ((grid_size - p3[1]) - (grid_size - p1[1])))
-    in a * d - c * b < 0
+    in b * c - a * d > 0
     -- (crossProduct p1 p2 grid_size) +
     -- (crossProduct p2 p3 grid_size) +
     -- (crossProduct p3 p1 grid_size) < 0
