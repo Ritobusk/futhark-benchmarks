@@ -42,6 +42,7 @@ def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][g
     in (grid, (map (\x -> i32.i64 x.1) unused), scaled_points)
 
 
+-- def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f32, i32, (i64, i64))) =
 def voronoiDiagram [grid_size] (grid : [grid_size][grid_size]i32) : ([grid_size][grid_size](f32, i32, (i64, i64))) =
     -- G2
     -- I use a tuple grid to represent for each pixel both the distance to the closest encountered site, 
@@ -87,8 +88,6 @@ def voronoiDiagram [grid_size] (grid : [grid_size][grid_size]i32) : ([grid_size]
             )
 
 def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64))) : [grid_size][grid_size](f32, i32, (i64, i64))=
-    --SPØRGSMÅL: Når man berenger det tæteste point til en island pixel, skal man så finde den mindste distance blandt all points
-    --           eller kun blandt dens naboer? Og skal man gå ud fra de 'transformerede' grid koordinater eller input koordinater 
     let stencil_1 = stencilK 1
     let (g'', _) = 
         loop (g, cond) = (grid, true) while cond do 
@@ -131,8 +130,7 @@ def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64
             in (unflatten g'', cond')
     in g''
 
-def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size-2][grid_size-2]i32 = --: [m](i64, i64) =
-    -- tabulate_2d (grid_size - 2) (grid_size - 2) 
+def locateVoronoiVertices [m] (grid : [m][m]i32) : [m-2][m-2]i32 = 
     -- tabulate_2d (grid_size ) (grid_size) 
     --     ( \r c ->
     --         if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then 0
@@ -140,7 +138,7 @@ def locateVoronoiVertices [grid_size] (grid : [grid_size][grid_size]i32) : [grid
     --             let is_corner = classifyVertexI32 grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
     --             in is_corner
     --     )
-    tabulate_2d (grid_size -2) (grid_size-2) 
+    tabulate_2d (m -2) (m-2) 
         ( \r c ->
             let (r, c) = (r+1, c+1)
             let is_corner = classifyVertexI32 grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
@@ -171,8 +169,8 @@ def createTriangles [m] (voronoi_diagram : [m][m]i32) (voronoi_vertices : [m-2][
         <| map (\i -> 
             let j = vv_idxs'[i/2].1
             -- Since I only calculate the voronoi vertices on a (grid_size -2) (grid_size -2) grid I need to adjust the indices a bit
-            let x = j / (m - 2)
-            let j = j + m + x*2 + 1
+            let column_offset = j / (m - 2)
+            let j = j + m + column_offset*2 + 1
 
             let c = j % m
             let r = j / m 
@@ -201,45 +199,33 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
                 else if isClockwise points[stack[0]] points[stack[1]] points[stack[2]] grid_size then
                     (stack[1:], triangles)
                 else
-                    -- let tc1 = (stack[0], stack[2], stack[1])
-                    -- let tc1 = (points[stack[0]], points[stack[1]], points[stack[2]])
-
                     ([stack[0], stack[2]], triangles ++ [(stack[0], stack[2], stack[1])])
                 
     in triangles
                 
 
-                
 
+-- > :img main ($loaddata "test_data200.txt")
 
---G5 - G6
--- kan man ikke bare gøre alt dette i G4?
---  Når intet findes returnerer man (0, (-1,-1,-1))
---  Når en 3'er findes returnerer man (1, (c1,c2,c3))
---  Når en 4'er findes returnerer man (2, (c1,c2,c3))
--- Og til sidst en filter der fjerner, dem der ikke er trekanter. 
+-- > :img main2 ($loaddata "test_data200.txt")
 
--- 1. prøv scan så man får et array, hvor alle voronoiVertices er indexeret.
--- 2. Derefter alloker et array til trekanterne
--- 3. lav map og scatter til at tilføje trekanterne til 2.
-
-
--- > :img main ($loaddata "test_data.txt")
-
--- > :img main2 ($loaddata "test_data2.txt")
-
-
+-- ==
+-- compiled random input {       [1000][2]f32 } 
+-- compiled random input {    [1000000][2]f32 } 
+-- compiled random input {   [10000000][2]f32 } 
 def main [n]
     (points : [n][2]f32)  =
     -- grid is: total_grid_size <= 18n, i.e. O(n)
     -- let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
-    let grid_size = 512 -- 8192
+    let grid_size = 128
 
     let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
+    -- let t =trace scaled_points
     -- let (t4, t10) = trace (grid, unused_p_flag)
     -- let t10 = trace (grid, unused_p_flag)
 
-    let grid' = voronoiDiagram grid
+    -- let t1 = trace grid
+    let grid' = voronoiDiagram grid 
     let grid''  = removeIslands grid'
     let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid''[i][j].1) 
     let voronoi_vertices = locateVoronoiVertices voronoi_diagram 
@@ -250,8 +236,9 @@ def main [n]
     -- let b = trace scaled_points
     let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
+    in length triangles
     -- in length unused_p_flag
-    in triangleGrid grid voronoi_diagram triangles scaled_points
+    -- in triangleGrid grid voronoi_diagram triangles scaled_points
 
 def main2 [n]
     (points : [n][2]f32)  =
@@ -277,7 +264,6 @@ def main2 [n]
 
 -- Comments/ToDo
 -- grid_size burde måske ikke afhænge af 'n', da det kan gøre noget ved den asymptotiske køretid.
--- Brug https://futhark-lang.org/examples/literate-basics.html       til at visualiserer gridet
 -- Overvej om griddet har brug for de 3 tupler, som bliver lavet i G2 eller om man kan nøjes med kun idx
 --    fremfor både idx og org_coords. Man kan nemlig bruge idx til at læse fra et n-langt array med org_coords
 --    Vent til at jeg er sidst i processen til at se om det giver en lille speedup eller ej.
