@@ -10,12 +10,17 @@ def shiftPoints [n][d]
 
 def neq lte x y = if x `lte` y then !(y `lte` x) else true
 
-def pack [n] lte (xs : [n](i64, i64)) =
+def pack_and_partition [n] lte (xs : [n](i64, i64)) =
   let (used, unused) =zip3 (indices xs) xs (rotate (-1) xs)
   |> partition (\(i,x,y) -> i == 0 || neq lte x.0 y.0) 
   in (map (.1) used, map (.1) unused)
 
-def pack_points = pack (i64.<=)     
+def pack lte xs =
+  zip3 (indices xs) xs (rotate (-1) xs)
+  |> filter (\(i,x,y) -> i == 0 || neq lte x y) |> map (.1)
+
+def pack_points_i64 = pack_and_partition (i64.<=)     
+def pack_points_i32 = pack (i32.<=)     
 
 
 def dist (p : (f32, f32)) (q: (f32, f32)) : f32 =
@@ -62,6 +67,23 @@ def findQuodrantOrAxis (p : (i64, i64)) (q : (i64, i64)) (grid_size : i64) : Qor
 
 def checkQuadrant (p : i32) (q1 : i32) (q2 : i32) (q3: i32) = p == q1 || p == q2 || p == q3
 
+def crossProduct (p1 : [2]i64) (p2 : [2]i64) (grid_size : i64) =
+    trace <| p1[0] * ((grid_size ) - p2[1]) - ((grid_size ) - p1[1]) * p2[0]
+
+-- Sum over the area under the edges. If it is positive then it is clockwise.
+-- Taken from https://stackoverflow.com/a/1165943
+def isClockwise (p1 : [2]i64) (p2 : [2]i64) (p3: [2]i64) (grid_size : i64) : bool =
+    let t = trace (p1, p2, p3)
+    let (a, b) = ((p2[0] - p1[0]), ((grid_size - p2[1]) - (grid_size - p1[1])))
+    let (c, d) = ((p3[0] - p1[0]), ((grid_size - p3[1]) - (grid_size - p1[1])))
+    in a * d - c * b < 0
+    -- (crossProduct p1 p2 grid_size) +
+    -- (crossProduct p2 p3 grid_size) +
+    -- (crossProduct p3 p1 grid_size) < 0
+    -- ((p2[0] - p1[0]) * ((grid_size - p2[1]) + (grid_size - p1[1]))) + 
+    --     ((p3[0] - p2[0]) * ((grid_size - p3[1]) + (grid_size - p2[1]))) + 
+    --     ((p1[0] - p3[0]) * ((grid_size - p1[1]) + (grid_size - p3[1])))
+    --     >= 0
 
 def classifyVertex (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) : bool =
     if q1 != q3 && q2 != q4 then -- Diagonals are different
@@ -95,8 +117,8 @@ def colours [m] (grid : [m][m]i32) : [m][m]u32 =
         let x = x**2
         in
             (u32.i32 (x*3) & 0xFF) << 16 |
-            (u32.i32 (x+127) & 0xFF) << 8 |
-            (u32.f64 (f64.cos (f64.i32 x) -f64.sin 3) & 0xFF)
+            (u32.i32 (x*8) & 0xFF) << 8 |
+            (u32.f64 (f64.cos (f64.i32 x) -f64.sin 3)*17 & 0xFF)
     in map (map f) (grid)
     
 def triangleGrid [m] [k] [n] (grid : [m][m]i32) (voronoi_diagram : [m][m]i32) (triangles : [k](i32, i32, i32)) (points : [n][2]i64) = -- : [m][m]u32 =
