@@ -4,42 +4,32 @@
 import "util"
 import "lib/github.com/diku-dk/sorts/radix_sort"
 
-def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, *[]i32, [n][2]i64) =
+
+
+def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
     -- G1: Moves points to a grid by translating the points such that 0,0 is the center of mass and scaling the points
     --     If a 2 points fit in the same place in the grid, only one of them is inserted.
-    let grid      = replicate grid_size (replicate grid_size (-1i32))
-    let shiftedP = shiftPoints points
 
-    let pointsT = transpose shiftedP
+    let pointsT = transpose points  
     let mins = map (reduce_comm f32.min f32.highest) pointsT
     let maxs = map (reduce_comm f32.max f32.lowest ) pointsT 
+    let largest_min = f32.minimum mins -- Pushes the points towards the first quodrant
 
-    let half_grid_size =  (f32.i64 (grid_size -1) / 2f32) 
-    let x_scale = (half_grid_size / (f32.max (f32.abs mins[0]) (f32.abs maxs[0])))
-    let y_scale = (half_grid_size / (f32.max (f32.abs mins[1]) (f32.abs maxs[1])))
+    let x_scale = ((f32.i64 grid_size - 1) / (f32.max (f32.abs mins[0]) (f32.abs maxs[0])))
+    let y_scale = ((f32.i64 grid_size - 1) / (f32.max (f32.abs mins[1]) (f32.abs maxs[1])))
     let scale   = f32.min x_scale y_scale 
 
-    let scaled_points = map (\cc -> map (\c -> i64.f32 <| f32.round <| c * scale + half_grid_size) cc) <| transpose pointsT 
+    let scaled_points = map (\cc -> map (\c -> i64.f32 <| f32.round <| (c - largest_min) * scale ) cc) <| transpose pointsT 
 
     let scaled_points_flat_idx =  map (\cc -> 
-        let x = (i64.f32 <| f32.round <| cc[0] * scale + half_grid_size)   
-        let y = grid_size * (i64.f32 <| f32.round <| cc[1] * scale + half_grid_size)
+        let x = (i64.f32 <| f32.round <| (cc[0] - largest_min) * scale )   
+        let y = grid_size * (i64.f32 <| f32.round <| (cc[1] - largest_min) * scale )
         in x + y
     ) <| transpose pointsT
 
-
-    let sorted_ids = radix_sort_int_by_key (\k -> k.0) (i32.i64 <| (log2Int (grid_size**2 ) +1)) i64.get_bit (zip scaled_points_flat_idx (iota (n)))
-    -- let t11 = trace <| scaled_points_flat_idx
-    -- let t14 = trace <| sorted_ids
-    let (used, unused) = pack_points_i64 sorted_ids
-
-    -- let t15 = trace <| used
-    -- let t16 = trace <| unused
-
-    let grid =
-        scatter (flatten grid) (map (.0) used) (map (\x -> i32.i64 x.1) used)
-        |> unflatten
-    in (grid, (map (\x -> i32.i64 x.1) unused), scaled_points)
+    let (grid, unused) = populateGrid (grid_size * grid_size) scaled_points_flat_idx (indices points)
+    let grid = unflatten grid
+    in (grid, unused, scaled_points)
 
 
 def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f32, i32)) =
@@ -218,11 +208,10 @@ def main [n]
     (points : [n][2]f32)  =
     let grid_size = 1024
 
-    let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
+    let (grid, unused, scaled_points) = movePointsToGrid points grid_size
     -- let t =trace scaled_points
     -- let (t4, t10) = trace (grid, unused_p_flag)
 
-    -- let t1 = trace grid
     let grid' = voronoiDiagram  grid  scaled_points
     let grid''  = removeIslands grid' scaled_points
     let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid''[i][j].1) 
@@ -233,16 +222,16 @@ def main [n]
 
     --let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
-    --in scaled_points
+    -- in scaled_points
     --in map (\i -> [triangles[i].0, triangles[i].1,triangles[i].2]) <| indices triangles
-    --in length triangles
+    -- in length triangles
     in triangleGrid grid voronoi_diagram triangles scaled_points
 
 def main2 [n]
     (points : [n][2]f32)  =
     let grid_size = 1024
 
-    let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
+    let (grid, unused, scaled_points) = movePointsToGrid points grid_size
 
     let grid' =  voronoiDiagram grid scaled_points
     let grid' =  removeIslands grid' scaled_points
