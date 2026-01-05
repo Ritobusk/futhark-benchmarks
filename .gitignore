@@ -27,3 +27,6 @@
 !**/lib/**
 !shell.nix
 external-data/
+pbbs/delaunayTriangulation/data
+pbbs/delaunayTriangulation/lib/github.com/diku-dk/segmented
+pbbs/delaunayTriangulation/lib/github.com/diku-dk/sorts
