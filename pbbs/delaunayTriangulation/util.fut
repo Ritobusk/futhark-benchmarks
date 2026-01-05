@@ -111,7 +111,7 @@ def colours [m] (grid : [m][m]i32) : [m][m]u32 =
         in
             (u32.i32 (x*3) & 0xFF) << 16 |
             (u32.i32 (x*8) & 0xFF) << 8 |
-            (u32.f64 (f64.cos (f64.i32 x) -f64.sin 3)*17 & 0xFF)
+            (u32.f32 (f32.cos (f32.i32 x) -f32.sin 3)*17 & 0xFF)
     in map (map f) (grid)
     
 def triangleGrid [m] [k] [n] (grid : [m][m]i32) (voronoi_diagram : [m][m]i32) (triangles : [k](i32, i32, i32)) (points : [n][2]i64) = -- : [m][m]u32 =

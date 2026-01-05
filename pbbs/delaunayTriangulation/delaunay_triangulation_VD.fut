@@ -42,87 +42,88 @@ def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][g
     in (grid, (map (\x -> i32.i64 x.1) unused), scaled_points)
 
 
--- def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f32, i32, (i64, i64))) =
-def voronoiDiagram [grid_size] (grid : [grid_size][grid_size]i32) : ([grid_size][grid_size](f32, i32, (i64, i64))) =
+def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f32, i32)) =
     -- G2
     -- I use a tuple grid to represent for each pixel both the distance to the closest encountered site, 
     --   this site's index and the coordinates to the original site which is now referenced
-    --   by the specific pixel: (dist, site_index, org_coords)
+    --   by the specific pixel: (dist, site_index)
     let stencil_1 = stencilK 1
     let plus_1 = tabulate_2d grid_size grid_size 
         (\r c ->
             if grid[r][c] != -1 then
-                (0f32, grid[r][c], (r,c))
+                (0f32, grid[r][c])
             else
-                loop (d, ind, (o_r, o_c)) =  (f32.highest, -1, (-1,-1)) for (i,j) in stencil_1 do
+                loop (d, ind) =  (f32.highest, -1) for (i,j) in stencil_1 do
                     let (r', c') = (r + i, c + j)
                     in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
-                        (d, ind, (o_r, o_c))
+                        (d, ind)
                     else 
                         let d' = dist (f32.i64 c,f32.i64 r) (f32.i64 c',f32.i64 r')
                         let ind' = grid[r'][c']
                         in if ind' != -1 && d' < d then
-                            (d', ind', (r',c'))
+                            (d', ind')
                         else
-                            (d, ind, (o_r, o_c))
+                            (d, ind)
         )
 
     in loop g = plus_1 for iteration < (log2Int grid_size) do
         let stencil_it = stencilK (grid_size / (2**(iteration+1)))
         in tabulate_2d grid_size grid_size 
             (\r c ->
-                loop (d, ind, (o_r, o_c)) =  (g[r][c].0, g[r][c].1, g[r][c].2) for (i,j) in stencil_it do
+                loop (d, ind) =  (g[r][c].0, g[r][c].1) for (i,j) in stencil_it do
                     let (r', c') = (r + i, c + j)
                     in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
-                        (d, ind, (o_r, o_c))
+                        (d, ind)
                     else 
                         let ind' = g[r'][c'].1
                         in if ind' != -1  then
-                            let d' = dist (f32.i64 c,f32.i64 r) (f32.i64 g[r'][c'].2.1, f32.i64 g[r'][c'].2.0)
+                            let d' = dist (f32.i64 c,f32.i64 r) (f32.i64 points[g[r'][c'].1][0], f32.i64 points[g[r'][c'].1][1])
                             in if d' < d then
-                                (d', ind', g[r'][c'].2)
+                                (d', ind')
                             else
-                                (d, ind, (o_r, o_c))      
+                                (d, ind)      
                         else
-                            (d, ind, (o_r, o_c))
+                            (d, ind)
             )
 
-def removeIslands [grid_size] (grid : [grid_size][grid_size](f32, i32, (i64, i64))) : [grid_size][grid_size](f32, i32, (i64, i64))=
+def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f32, i32)) (points : [n][2]i64) : [grid_size][grid_size](f32, i32) =
     let stencil_1 = stencilK 1
     let (g'', _) = 
         loop (g, cond) = (grid, true) while cond do 
             let (g'', island_flag_array) =  unzip <| flatten <| tabulate_2d grid_size grid_size 
                 (\r c ->
-                    let rule = findQuodrantOrAxis (r,c) g[r][c].2 grid_size
+                    let (site_r, site_c) = (points[g[r][c].1][1], points[g[r][c].1][0])
+                    let rule = findQuodrantOrAxis (r,c) (site_r, site_c) grid_size
                     let tmp = 
                         if      rule == #center then (g[r][c], false)
-                        else if rule == #up    && g[r-1][c].1 == g[r][c].1 then (g[r][c], false)
-                        else if rule == #down  && g[r+1][c].1 == g[r][c].1 then (g[r][c], false)
-                        else if rule == #right && g[r][c+1].1 == g[r][c].1 then (g[r][c], false)
-                        else if rule == #left  && g[r][c-1].1 == g[r][c].1 then (g[r][c], false)
+                        else if rule == #up    && g[r-1][c].1 == g[r][c].1                                            then (g[r][c], false)
+                        else if rule == #down  && g[r+1][c].1 == g[r][c].1                                            then (g[r][c], false)
+                        else if rule == #right && g[r][c+1].1 == g[r][c].1                                            then (g[r][c], false)
+                        else if rule == #left  && g[r][c-1].1 == g[r][c].1                                            then (g[r][c], false)
                         else if rule == #leftUp    && (checkQuadrant g[r][c].1 g[r-1][c-1].1 g[r-1][c].1 g[r][c-1].1) then (g[r][c], false)
                         else if rule == #leftDown  && (checkQuadrant g[r][c].1 g[r+1][c-1].1 g[r+1][c].1 g[r][c-1].1) then (g[r][c], false)
-                        else if rule == #rightUp && (checkQuadrant g[r][c].1 g[r-1][c+1].1 g[r-1][c].1 g[r][c+1].1) then (g[r][c], false)
-                        else if rule == #rightDown  && (checkQuadrant g[r][c].1 g[r+1][c+1].1 g[r+1][c].1 g[r][c+1].1) then (g[r][c], false)
+                        else if rule == #rightUp   && (checkQuadrant g[r][c].1 g[r-1][c+1].1 g[r-1][c].1 g[r][c+1].1) then (g[r][c], false)
+                        else if rule == #rightDown && (checkQuadrant g[r][c].1 g[r+1][c+1].1 g[r+1][c].1 g[r][c+1].1) then (g[r][c], false)
 
                         --Find new site to associate pixel with
                         else 
                             -- Find the closest point among the neighbours
                             let t33 = trace (rule, r,c, g[r][c])
-                            in loop ((d, ind, (o_r, o_c)), island_flag) =  ((f32.highest, -1, (-1,-1)), true) for (i,j) in stencil_1 do
+                            in loop ((d, ind), island_flag) =  ((f32.highest, -1), true) for (i,j) in stencil_1 do
                                 let (r', c') = (r + i, c + j)
                                 in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
-                                    ((d, ind, (o_r, o_c)), island_flag)
+                                    ((d, ind), island_flag)
                                 else 
                                     let ind' = g[r'][c'].1
+                                    let (site_r, site_c) = (points[ind'][1], points[ind'][0])
                                     in if ind' != -1  then
-                                        let d' = dist (f32.i64 c,f32.i64 r) (f32.i64 g[r'][c'].2.1, f32.i64 g[r'][c'].2.0)
+                                        let d' = dist (f32.i64 r, f32.i64 c) (f32.i64 site_r, f32.i64 site_c)
                                         in if d' < d then
-                                            ((d', ind', g[r'][c'].2), island_flag)
+                                            ((d', ind'), island_flag)
                                         else
-                                            ((d, ind, (o_r, o_c)), island_flag)
+                                            ((d, ind), island_flag)
                                     else
-                                        ((d, ind, (o_r, o_c)), island_flag)
+                                        ((d, ind), island_flag)
                     in tmp
                 )
             -- Check if any islands where found. If so we loop again!
@@ -215,25 +216,21 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
 -- compiled random input {   [10000000][2]f32 } 
 def main [n]
     (points : [n][2]f32)  =
-    -- grid is: total_grid_size <= 18n, i.e. O(n)
-    -- let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
-    let grid_size = 4096
+    let grid_size = 1024
 
     let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
     -- let t =trace scaled_points
     -- let (t4, t10) = trace (grid, unused_p_flag)
-    -- let t10 = trace (grid, unused_p_flag)
 
     -- let t1 = trace grid
-    let grid' = voronoiDiagram grid 
-    -- let grid''  = removeIslands grid'
-    let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1) 
+    let grid' = voronoiDiagram  grid  scaled_points
+    let grid''  = removeIslands grid' scaled_points
+    let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid''[i][j].1) 
     let voronoi_vertices = locateVoronoiVertices voronoi_diagram 
 
     -- G5 and G6
     let triangles = createTriangles voronoi_diagram voronoi_vertices
 
-    -- let b = trace scaled_points
     --let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
     --in scaled_points
@@ -243,16 +240,12 @@ def main [n]
 
 def main2 [n]
     (points : [n][2]f32)  =
-    -- grid is: total_grid_size <= 18n, i.e. O(n)
-    -- let grid_size = trace <| 2 ** (log2Int (i64.f64 <| 3 * (f64.sqrt <| f64.i64 (n) )) + 1) -- To power of 2
-    let grid_size = 512
+    let grid_size = 1024
 
     let (grid, unused_p_flag, scaled_points) = movePointsToGrid points grid_size
-    -- let (t4, t10) = trace (grid, unused_p_flag)
-    -- let t10 = trace (unused_p_flag)
 
-    let grid' =  voronoiDiagram grid
-    let grid' = removeIslands grid'
+    let grid' =  voronoiDiagram grid scaled_points
+    let grid' =  removeIslands grid' scaled_points
     let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1) 
     let voronoi_vertices = locateVoronoiVertices voronoi_diagram 
 
@@ -287,42 +280,3 @@ def main2 [n]
 -- Så kan man få en flad repræsentation. 
 
 -- C3: I G1 burde jeg returnerer et par af de unused, så man kan referere det ubrugte site til det brugte. 
--- trace: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0],
---         [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
--- trace: [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
---         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]
--- trace: [(1, 40), (2, 116), (3, 152), (4, 172), (5, 173), (6, 182), (7, 193), (8, 207), (9, 292)]
