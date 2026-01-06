@@ -1,5 +1,5 @@
 def populateGrid [k] 't (n: i64) (is: [k]i64) (xs: [k]t) : ([n]i32, []t) =
-    let H = hist i64.min k (n) is (indices xs)
+    let H = trace <| hist i64.min k (n) is (indices xs)
     let grid' = map (\x -> if x == k then -1i32 else i32.i64 x) H
     let unused  = map2 (\i j -> H[i] == j) is (indices xs)
         |> zip xs
@@ -7,6 +7,10 @@ def populateGrid [k] 't (n: i64) (is: [k]i64) (xs: [k]t) : ([n]i32, []t) =
         |> (.1)
         |> map (.0)
   in (grid', unused)
+    -- let unused  = zip xs unused
+    -- let unused  = partition (.1) unused
+    -- let unused = unused.1
+    -- let unused = map (.0) unused
 
 def neq lte x y = if x `lte` y then !(y `lte` x) else true
 

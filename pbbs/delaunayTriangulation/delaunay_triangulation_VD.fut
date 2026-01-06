@@ -181,13 +181,12 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
         ) (iota (4 * grid_size)) 
     -- let tc2 = trace grid
     let edge = pack_points_i32 edge -- It might be slower to remove duplicates
+
     let (_, triangles) = 
-        loop (stack, triangles) = ([], [])
-            for x in edge do 
+        loop (stack, triangles) = ([edge[0], edge[1]], [])
+            for x in edge[2:] do 
                 let stack = stack ++ [x]
-                in if length stack < 3 then
-                    (stack, triangles)
-                else if isClockwise points[stack[0]] points[stack[1]] points[stack[2]] grid_size then
+                in if isClockwise points[stack[0]] points[stack[1]] points[stack[2]] grid_size then
                     (stack[1:], triangles)
                 else
                     ([stack[0], stack[2]], triangles ++ [(stack[0], stack[2], stack[1])])
@@ -246,14 +245,6 @@ def main2 [n]
     in triangleGrid grid voronoi_diagram triangles scaled_points
 
 -- Comments/ToDo
--- grid_size burde måske ikke afhænge af 'n', da det kan gøre noget ved den asymptotiske køretid.
--- Overvej om griddet har brug for de 3 tupler, som bliver lavet i G2 eller om man kan nøjes med kun idx
---    fremfor både idx og org_coords. Man kan nemlig bruge idx til at læse fra et n-langt array med org_coords
---    Vent til at jeg er sidst i processen til at se om det giver en lille speedup eller ej.
-
-
---G1: Dette burde kunne gøres bedre med en hist eller scatter.
-
 
 -- Cs: Jeg burde bruge lave et 'greedy' prøv at løs så mange ting som muligt. Se om der er konflikter og prøv igen approach approach
 
