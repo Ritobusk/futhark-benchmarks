@@ -7,6 +7,7 @@ import "lib/github.com/diku-dk/sorts/radix_sort"
 
 
 def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
+
     -- G1: Moves points to a grid by translating the points such that 0,0 is the center of mass and scaling the points
     --     If a 2 points fit in the same place in the grid, only one of them is inserted.
 
@@ -27,9 +28,18 @@ def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][g
         in x + y
     ) <| transpose pointsT
 
-    let (grid, unused) = populateGrid (grid_size * grid_size) scaled_points_flat_idx (indices points)
-    let grid = unflatten grid
-    in (grid, unused, scaled_points)
+    -- let (grid, unused) = populateGrid (grid_size * grid_size) scaled_points_flat_idx (indices points)
+    -- let grid = unflatten grid
+    let sorted_ids = radix_sort_int_by_key (\k -> k.0) (i32.i64 <| (log2Int (grid_size**2 ) +1)) i64.get_bit (zip scaled_points_flat_idx (iota (n)))
+
+    let (used, unused) = pack_points_i64 sorted_ids
+    let grid      = replicate grid_size (replicate grid_size (-1i32))
+    let grid =
+        scatter (flatten grid) (map (.0) used) (map (\x -> i32.i64 x.1) used)
+        |> unflatten
+
+    in (grid, (map (\x -> x.1) unused), scaled_points)
+    -- in (grid, unused, scaled_points)
 
 
 def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f32, i32)) =
@@ -221,10 +231,10 @@ def main [n]
 
     --let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
-    -- in scaled_points
+    in triangles 
     --in map (\i -> [triangles[i].0, triangles[i].1,triangles[i].2]) <| indices triangles
     -- in length triangles
-    in triangleGrid grid voronoi_diagram triangles scaled_points
+    -- in triangleGrid grid voronoi_diagram triangles scaled_points
 
 def main2 [n]
     (points : [n][2]f32)  =
