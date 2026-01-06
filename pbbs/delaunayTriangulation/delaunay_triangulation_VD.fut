@@ -127,7 +127,7 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f32, i32)) (poi
                     in tmp
                 )
             -- Check if any islands where found. If so we loop again!
-            let cond' = trace <| reduce (\acc f -> f && acc) false (island_flag_array)
+            let cond' = trace <| reduce (\acc f -> f || acc) false (island_flag_array)
             in (unflatten g'', cond')
     in g''
 
@@ -231,7 +231,7 @@ def main [n]
 
     --let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
-    in triangles 
+    in length triangles 
     --in map (\i -> [triangles[i].0, triangles[i].1,triangles[i].2]) <| indices triangles
     -- in length triangles
     -- in triangleGrid grid voronoi_diagram triangles scaled_points
