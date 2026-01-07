@@ -2,46 +2,8 @@
 --  futhark dataset -g 5i32 -g [10][2]f32 > test_data.txt
 
 import "util"
-import "lib/github.com/diku-dk/sorts/radix_sort"
 
-
-
-def movePointsToGrid1 [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
-
-    -- G1: Moves points to a grid by translating the points such that 0,0 is the center of mass and scaling the points
-    --     If a 2 points fit in the same place in the grid, only one of them is inserted.
-
-    let pointsT = transpose points  
-    let mins = map (reduce_comm f32.min f32.highest) pointsT
-    let maxs = map (reduce_comm f32.max f32.lowest ) pointsT 
-    let largest_min = f32.minimum mins -- Pushes the points towards the first quodrant
-
-    let x_scale = ((f32.i64 grid_size - 1) / (f32.max (f32.abs mins[0]) (f32.abs maxs[0])))
-    let y_scale = ((f32.i64 grid_size - 1) / (f32.max (f32.abs mins[1]) (f32.abs maxs[1])))
-    let scale   = f32.min x_scale y_scale 
-
-    let scaled_points = map (\cc -> map (\c -> i64.f32 <| f32.round <| (c - largest_min) * scale ) cc) <| transpose pointsT 
-
-    let scaled_points_flat_idx =  map (\cc -> 
-        let x = (i64.f32 <| f32.round <| (cc[0] - largest_min) * scale )   
-        let y = grid_size * (i64.f32 <| f32.round <| (cc[1] - largest_min) * scale )
-        in x + y
-    ) <| transpose pointsT
-
-    -- let (grid, unused) = populateGrid (grid_size * grid_size) scaled_points_flat_idx (indices points)
-    -- let grid = unflatten grid
-    let sorted_ids = radix_sort_int_by_key (\k -> k.0) (i32.i64 <| (log2Int (grid_size**2 ) +1)) i64.get_bit (zip scaled_points_flat_idx (iota (n)))
-
-    let (used, unused) = pack_points_i64 sorted_ids
-    let grid      = replicate grid_size (replicate grid_size (-1i32))
-    let grid =
-        scatter (flatten grid) (map (.0) used) (map (\x -> i32.i64 x.1) used)
-        |> unflatten
-
-    in (grid, (map (\x -> x.1) unused), scaled_points)
-
-
-def movePointsToGrid2 [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
+def movePointsToGrid [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
 
     -- G1: Moves points to a grid by translating the points such that 0,0 is the center of mass and scaling the points
     --     If a 2 points fit in the same place in the grid, only one of them is inserted.
@@ -66,16 +28,6 @@ def movePointsToGrid2 [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][
     let (grid, unused) = populateGrid (grid_size * grid_size) scaled_points_flat_idx (indices points)
     let grid = unflatten grid
     in (grid, unused, scaled_points)
-    -- let sorted_ids = radix_sort_int_by_key (\k -> k.0) (i32.i64 <| (log2Int (grid_size**2 ) +1)) i64.get_bit (zip scaled_points_flat_idx (iota (n)))
-    --
-    -- let (used, unused) = pack_points_i64 sorted_ids
-    -- let grid      = replicate grid_size (replicate grid_size (-1i32))
-    -- let grid =
-    --     scatter (flatten grid) (map (.0) used) (map (\x -> i32.i64 x.1) used)
-    --     |> unflatten
-    --
-    -- in (grid, (map (\x -> x.1) unused), scaled_points)
-
 
 def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f32, i32)) =
     -- G2
@@ -167,13 +119,6 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f32, i32)) (poi
     in g''
 
 def locateVoronoiVertices [m] (grid : [m][m]i32) : [m-2][m-2]i32 = 
-    -- tabulate_2d (grid_size ) (grid_size) 
-    --     ( \r c ->
-    --         if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then 0
-    --         else
-    --             let is_corner = classifyVertexI32 grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
-    --             in is_corner
-    --     )
     tabulate_2d (m -2) (m-2) 
         ( \r c ->
             let (r, c) = (r+1, c+1)
@@ -246,9 +191,6 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
                 
 
 
--- > :img main ($loaddata "test_data200.txt")
-
--- > :img main2 ($loaddata "test_data200.txt")
 
 -- ==
 -- compiled random input {       [1000][2]f32 } 
@@ -256,11 +198,9 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
 -- compiled random input {   [10000000][2]f32 } 
 def main [n]
     (points : [n][2]f32)  =
-    let grid_size = 1024 * 4
+    let grid_size = 1024 * 2
 
-    let (grid, unused, scaled_points) = movePointsToGrid2 points grid_size
-    -- let t =trace scaled_points
-    -- let (t4, t10) = trace (grid, unused_p_flag)
+    let (grid, unused, scaled_points) = movePointsToGrid points grid_size
 
     let grid' = voronoiDiagram  grid  scaled_points
     let grid''  = removeIslands grid' scaled_points
@@ -270,36 +210,17 @@ def main [n]
     -- G5 and G6
     let triangles = createTriangles voronoi_diagram voronoi_vertices
 
-    --let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
+    let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
 
     -- in length triangles 
     --in map (\i -> [triangles[i].0, triangles[i].1,triangles[i].2]) <| indices triangles
     -- in triangles
     in triangleGrid grid voronoi_diagram triangles scaled_points
 
-def main2 [n]
-    (points : [n][2]f32)  =
-    let grid_size = 1024
-
-    let (grid, unused, scaled_points) = movePointsToGrid2 points grid_size
-
-    let grid' =  voronoiDiagram grid scaled_points
-    let grid' =  removeIslands grid' scaled_points
-    let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1) 
-    let voronoi_vertices = locateVoronoiVertices voronoi_diagram 
-
-    -- G5 and G6
-    let triangles = createTriangles voronoi_diagram voronoi_vertices
-
-    let triangles = (fixConvexHull voronoi_diagram scaled_points) ++ triangles
-
-    in triangleGrid grid voronoi_diagram triangles scaled_points
 
 -- Comments/ToDo
 -- Tjek G3
 -- Gør C1 hurtig
--- Prøv at kør med hip backend derhjemme.
--- Få visualiseringen til at virke igen....
 
 
 -- Mål:
