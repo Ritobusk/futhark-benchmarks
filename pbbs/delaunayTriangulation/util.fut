@@ -39,6 +39,36 @@ def pack_points_i64 = pack_and_partition (i64.<=)
 def pack_points_i32 = pack (i32.<=)     
 
 
+-- sign and point in triangle taken from https://stackoverflow.com/a/2049593
+def sign (p1 : [2]f64) (p2 : [2]f64) (p3 : [2]f64)  : f64 =
+    (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
+
+def pointInTriangle (p1 : [2]f64) (p2 : [2]f64) (p3 : [2]f64) (q : [2]f64) : bool =
+    let d1 = sign q p1 p2
+    let d2 = sign q p2 p3
+    let d3 = sign q p3 p1
+    
+    let has_neg = (d1 < 0f64) || (d2 < 0f64) || (d3 < 0f64)
+    let has_pos = (d1 > 0f64) || (d2 > 0f64) || (d3 > 0f64)
+    in !(has_neg && has_pos)
+
+    
+-- bool PointInTriangle (fPoint pt, fPoint v1, fPoint v2, fPoint v3)
+-- {
+--     float d1, d2, d3;
+--     bool has_neg, has_pos;
+--
+--     d1 = sign(pt, v1, v2);
+--     d2 = sign(pt, v2, v3);
+--     d3 = sign(pt, v3, v1);
+--
+--     has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+--     has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+--
+--     return !(has_neg && has_pos);
+-- }
+
+
 def dist (p : (f64, f64)) (q: (f64, f64)) : f64 =
     f64.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
 

@@ -217,23 +217,31 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 
     let sc_shp = scan (+) 0 shp
     let sc_shp_exclusive = (rotate (-1) sc_shp) with [0] = 0 
-    let is_shifted = replicate (p) false 
+    let is_shifted = replicate (n) false 
 
     -- Find the rule for each non shifted site
-    let rules = map3 (
-        \s up i -> 
-            if !s then
+    let rules = map2 (
+        \up i -> 
+            if !is_shifted[up] then
                 let fan =  map (\j -> triangle_fans[j + sc_shp_exclusive[i]].1) (iota shp[i])
+                let p   = points[up]
+                let is_in_fan = map (\tr -> 
+                        let t1 = if is_shifted[tr.0] then points[tr.0] else map (f64.i64) grid_points[tr.0]
+                        let t2 = if is_shifted[tr.1] then points[tr.1] else map (f64.i64) grid_points[tr.1]
+                        let t3 = if is_shifted[tr.2] then points[tr.2] else map (f64.i64) grid_points[tr.2]
+                        in pointInTriangle t1 t2 t3 p
+                    ) fan 
+                    |> reduce (||) false
                 -- Check if inside triangle fan
                 -- If yes then rule 1
                 -- else check :
-                in (length fan)
+                in i64.bool is_in_fan
             else -1
 
-        ) is_shifted used_points (indices used_points)
+        ) used_points (indices used_points)
 
-    in shp
-    -- in (shp, sc_shp_exclusive, rules)
+    -- in shp
+    in (shp, sc_shp_exclusive, rules, f_idx, is_shifted)
 
 -- ==
 -- compiled random input {       [1000][2]f64 } 
@@ -241,7 +249,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 -- compiled random input {   [10000000][2]f64 } 
 def main [n]
     (points : [n][2]f64)  =
-    let grid_size = 1024 *4 --/ 32
+    let grid_size = 1024  --/ 32
 
     let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
 
@@ -257,10 +265,11 @@ def main [n]
 
     -- in length triangles 
     --in map (\i -> [triangles[i].0, triangles[i].1,triangles[i].2]) <| indices triangles
-    let shps =  (shiftSites triangles used scaled_points scaled_points_grid)
-    in reduce (i64.max) 0 shps
-    -- in triangleGrid grid voronoi_diagram triangles scaled_points
+    -- in  (shiftSites triangles used scaled_points scaled_points_grid)
+    -- in reduce (i64.max) 0 shps
+    in triangleGrid grid voronoi_diagram triangles scaled_points_grid
 
+-- > :img main ($loaddata "test_data10.txt")
 
 -- Comments/ToDo
 -- Tjek G3
