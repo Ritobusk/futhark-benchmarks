@@ -1,4 +1,4 @@
--- > comparePoints ($loaddata "t1") ($loaddata "t2")
+-- > comparePoints ($loaddata "t10") ($loaddata "t20")
 
 def comparePoints [n] (g1 : [n][2]i64) (g2: [n][2]i64) =
     let flags = map3 (\ a b r -> 

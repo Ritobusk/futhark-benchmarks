@@ -1,16 +1,26 @@
-def populateGrid [k] 't (n: i64) (is: [k]i64) (xs: [k]t) : ([n]i32, []t) =
+def populateGrid [k] 't (n: i64) (is: [k]i64) (xs: [k]t) : ([n]i32, []t, []t) =
     let H = hist i64.min k (n) is (indices xs)
     let grid' = map (\x -> if x == k then -1i32 else i32.i64 x) H
-    let unused  = map2 (\i j -> H[i] == j) is (indices xs)
+    let (used, unused)  = map2 (\i j -> H[i] == j) is (indices xs)
         |> zip xs
         |> partition (.1)
-        |> (.1)
-        |> map (.0)
-    in (grid', unused)
+    in (grid', map (.0) used, map (.0) unused)
+        -- |> map (.0)
     -- let unused  = zip xs unused
     -- let unused  = partition (.1) unused
     -- let unused = unused.1
     -- let unused = map (.0) unused
+
+def sgmscan 't [n] (op: t->t->t) (ne: t)
+                   (flg : [n]i32) (arr : [n]t) : [n]t =
+    let flgs_vals =
+        scan ( \ (f1, x1) (f2,x2) ->
+              let f = f1 | f2 in
+              if f2 != 0 then (f, x2)
+              else (f, op x1 x2) )
+            (0,ne) (zip flg arr)
+    let (_, vals) = unzip flgs_vals
+    in vals
 
 def neq lte x y = if x `lte` y then !(y `lte` x) else true
 
@@ -29,17 +39,17 @@ def pack_points_i64 = pack_and_partition (i64.<=)
 def pack_points_i32 = pack (i32.<=)     
 
 
-def dist (p : (f32, f32)) (q: (f32, f32)) : f32 =
-    f32.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
+def dist (p : (f64, f64)) (q: (f64, f64)) : f64 =
+    f64.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
 
-def disti64 (p : (i64, i64)) (q: (i64, i64)) : f32 =
-    let p = (f32.i64 p.0, f32.i64 p.1)
-    let q = (f32.i64 q.0, f32.i64 q.1)
-    in f32.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
+def disti64 (p : (i64, i64)) (q: (i64, i64)) : f64 =
+    let p = (f64.i64 p.0, f64.i64 p.1)
+    let q = (f64.i64 q.0, f64.i64 q.1)
+    in f64.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
 
-def normalizei64 (p : (i64,i64)) : (f32, f32) =
-    let p = (f32.i64 p.0, f32.i64 p.1)
-    let mag = f32.sqrt (p.0**2 + p.1**2)
+def normalizei64 (p : (i64,i64)) : (f64, f64) =
+    let p = (f64.i64 p.0, f64.i64 p.1)
+    let mag = f64.sqrt (p.0**2 + p.1**2)
     in (p.0/mag, p.1/mag)
 
 def stencilK (k : i64) =
@@ -107,8 +117,8 @@ def classifyVertexAndTriangulation (q1 : i32) (q2 : i32) (q3 : i32) (q4 : i32) :
 
 
 -- gridToGray (tabulate_2d grid_size grid_size (\i j -> i32.bool voronoi_vertices[i][j])) (1)
-def gridToGray [m] (grid : [m][m]i32) (max_idx : i64) : [m][m]f32  =
-     tabulate_2d m m (\i j -> (f32.i32 grid[i][j]) / (f32.i64 max_idx))
+def gridToGray [m] (grid : [m][m]i32) (max_idx : i64) : [m][m]f64  =
+     tabulate_2d m m (\i j -> (f64.i32 grid[i][j]) / (f64.i64 max_idx))
 
 -- let test_grid' = colours (tabulate_2d grid_size grid_size (\i j -> grid'[i][j].1)) 
 def colours [m] (grid : [m][m]i32) : [m][m]u32 =
@@ -117,7 +127,7 @@ def colours [m] (grid : [m][m]i32) : [m][m]u32 =
         in
             (u32.i32 (x*3) & 0xFF) << 16 |
             (u32.i32 (x*8) & 0xFF) << 8 |
-            (u32.f32 (f32.cos (f32.i32 x) -f32.sin 3)*17 & 0xFF)
+            (u32.f64 (f64.cos (f64.i32 x) -f64.sin 3)*17 & 0xFF)
     in map (map f) (grid)
     
 def triangleGrid [m] [k] [n] (grid : [m][m]i32) (voronoi_diagram : [m][m]i32) (triangles : [k](i32, i32, i32)) (points : [n][2]i64) = -- : [m][m]u32 =
@@ -133,20 +143,20 @@ def triangleGrid [m] [k] [n] (grid : [m][m]i32) (voronoi_diagram : [m][m]i32) (t
             let dist3 = disti64 (p3[0], p3[1]) (p1[0], p1[1])
 
             let l1 = map (\i -> 
-                let x = ((i64.f32 ((f32.i64 i) * dir1.0)) + p1[0])
-                let y = ((i64.f32 ((f32.i64 i) * dir1.1)) + p1[1])
+                let x = ((i64.f64 ((f64.i64 i) * dir1.0)) + p1[0])
+                let y = ((i64.f64 ((f64.i64 i) * dir1.1)) + p1[1])
                 in (y, x)
-                ) <| iota (i64.f32 dist1) 
+                ) <| iota (i64.f64 dist1) 
             let l2 = map (\i -> 
-                let x = ((i64.f32 ((f32.i64 i) * dir2.0)) + p2[0])
-                let y = ((i64.f32 ((f32.i64 i) * dir2.1)) + p2[1])
+                let x = ((i64.f64 ((f64.i64 i) * dir2.0)) + p2[0])
+                let y = ((i64.f64 ((f64.i64 i) * dir2.1)) + p2[1])
                 in (y, x)
-                ) <| iota (i64.f32 dist2) 
+                ) <| iota (i64.f64 dist2) 
             let l3 = map (\i -> 
-                let x = ((i64.f32 ((f32.i64 i) * dir3.0)) + p3[0])
-                let y = ((i64.f32 ((f32.i64 i) * dir3.1)) + p3[1])
+                let x = ((i64.f64 ((f64.i64 i) * dir3.0)) + p3[0])
+                let y = ((i64.f64 ((f64.i64 i) * dir3.1)) + p3[1])
                 in (y, x)
-                ) <| iota (i64.f32 dist3) 
+                ) <| iota (i64.f64 dist3) 
 
             let lines = l1 ++ l2 ++ l3
             in loop g' = g for x in lines do

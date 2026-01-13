@@ -1,25 +1,25 @@
 import "lib/github.com/diku-dk/sorts/radix_sort"
 import "delaunay_triangulation_VD"
 
-def movePointsToGrid1 [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
+def movePointsToGrid1 [n] (points : [n][2]f64) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
 
     -- G1: Moves points to a grid by translating the points such that 0,0 is the center of mass and scaling the points
     --     If a 2 points fit in the same place in the grid, only one of them is inserted.
 
     let pointsT = transpose points  
-    let mins = map (reduce_comm f32.min f32.highest) pointsT
-    let maxs = map (reduce_comm f32.max f32.lowest ) pointsT 
-    let largest_min = f32.minimum mins -- Pushes the points towards the first quodrant
+    let mins = map (reduce_comm f64.min f64.highest) pointsT
+    let maxs = map (reduce_comm f64.max f64.lowest ) pointsT 
+    let largest_min = f64.minimum mins -- Pushes the points towards the first quodrant
 
-    let x_scale = ((f32.i64 grid_size - 1) / (f32.max (f32.abs mins[0]) (f32.abs maxs[0])))
-    let y_scale = ((f32.i64 grid_size - 1) / (f32.max (f32.abs mins[1]) (f32.abs maxs[1])))
-    let scale   = f32.min x_scale y_scale 
+    let x_scale = ((f64.i64 grid_size - 1) / (f64.max (f64.abs mins[0]) (f64.abs maxs[0])))
+    let y_scale = ((f64.i64 grid_size - 1) / (f64.max (f64.abs mins[1]) (f64.abs maxs[1])))
+    let scale   = f64.min x_scale y_scale 
 
-    let scaled_points = map (\cc -> map (\c -> i64.f32 <| f32.round <| (c - largest_min) * scale ) cc) <| transpose pointsT 
+    let scaled_points = map (\cc -> map (\c -> i64.f64 <| f64.round <| (c - largest_min) * scale ) cc) <| transpose pointsT 
 
     let scaled_points_flat_idx =  map (\cc -> 
-        let x = (i64.f32 <| f32.round <| (cc[0] - largest_min) * scale )   
-        let y = grid_size * (i64.f32 <| f32.round <| (cc[1] - largest_min) * scale )
+        let x = (i64.f64 <| f64.round <| (cc[0] - largest_min) * scale )   
+        let y = grid_size * (i64.f64 <| f64.round <| (cc[1] - largest_min) * scale )
         in x + y
     ) <| transpose pointsT
 
@@ -37,24 +37,24 @@ def movePointsToGrid1 [n] (points : [n][2]f32) (grid_size : i64) : ([grid_size][
 
 -- ==
 -- entry: main main2 test
--- compiled random input {       [1000][2]f32 } 
--- compiled random input {    [1000000][2]f32 } 
--- compiled random input {   [10000000][2]f32 } 
+-- compiled random input {       [1000][2]f64 } 
+-- compiled random input {    [1000000][2]f64 } 
+-- compiled random input {   [10000000][2]f64 } 
 def main [n]
-    (points : [n][2]f32)  =
+    (points : [n][2]f64)  =
     let grid_size = 1024
     let (grid, unused, scaled_points) = movePointsToGrid1 points grid_size
     in grid
 
 entry main2 [n]
-    (points : [n][2]f32)  =
+    (points : [n][2]f64)  =
     let grid_size = 1024
 
     let (grid', unused', scaled_points') = movePointsToGrid points grid_size
     in grid'
 
 entry test [n]
-    (points : [n][2]f32)  =
+    (points : [n][2]f64)  =
     let grid_size = 1024
     let (grid, unused, scaled_points) = movePointsToGrid1 points grid_size
     let (grid', unused', scaled_points') = movePointsToGrid2 points grid_size
