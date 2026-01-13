@@ -222,7 +222,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 
 
 
-    let is_shifted = replicate (n) false 
+    let is_shifted = (replicate (n) false ) with [0] = true
 
 
     -- Do heuristic before I compute the rules to see whether or not a site should be
@@ -230,9 +230,14 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
     -- This is done with a hist (min)   on the fans such that each site will have 
     --  the smallest indices of a site that is part of some fan 
     
-    let f_triangles = map (\tf -> map (i64.i32) [tf.1.0,tf.1.1,tf.1.2]) triangle_fans |> flatten
-    let f_site_tri  = map (\tf -> replicate 3 tf.0) triangle_fans |> flatten
-    -- NEEED to do a check on whether or not a point is shifted!!!
+    let f_triangles = map (\tf -> 
+            if is_shifted[tf.0] then [-1, -1, -1] 
+            else map (i64.i32) [tf.1.0,tf.1.1,tf.1.2]
+        ) triangle_fans |> flatten
+
+    let f_site_tri  = map (\tf -> replicate 3 tf.0) triangle_fans 
+                    |> flatten
+    -- Maybe instead of site being highest f_triangles should be -1 such that they are ignored.
     let H = hist i32.min (i32.i64 n) (n) f_triangles f_site_tri
 
     -- let valid_sites = map2 (\i j ->
