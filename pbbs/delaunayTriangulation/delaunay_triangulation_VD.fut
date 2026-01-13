@@ -201,7 +201,9 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 
     let flag_arr = map2 (
         \(f, _) i ->  
-            if i + 1 < (length triangle_fans) then (f != triangle_fans[i+1].0) |> i32.bool else 0i32 ) triangle_fans (indices triangle_fans)
+            if i + 1 < (length triangle_fans) then (f != triangle_fans[i+1].0) |> i32.bool 
+            else 0i32 
+        ) triangle_fans (indices triangle_fans)
     let f_idx = scan (+) 0 flag_arr
 
     -- Might be faster with a scatter instead of filter
@@ -217,7 +219,29 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 
     let sc_shp = scan (+) 0 shp
     let sc_shp_exclusive = (rotate (-1) sc_shp) with [0] = 0 
+
+
+
     let is_shifted = replicate (n) false 
+
+
+    -- Do heuristic before I compute the rules to see whether or not a site should be
+    --   computed
+    -- This is done with a hist (min)   on the fans such that each site will have 
+    --  the smallest indices of a site that is part of some fan 
+    
+    let f_triangles = map (\tf -> map (i64.i32) [tf.1.0,tf.1.1,tf.1.2]) triangle_fans |> flatten
+    let f_site_tri  = map (\tf -> replicate 3 tf.0) triangle_fans |> flatten
+    -- NEEED to do a check on whether or not a point is shifted!!!
+    let H = hist i32.min (i32.i64 n) (n) f_triangles f_site_tri
+
+    -- let valid_sites = map2 (\i j ->
+    --         let up = used_points[i]
+    --         --make an ii1
+    --         let s  = sc_shp[i]
+    --         let tr = 
+    --         in up
+    --     ) f_idx (indices )
 
     -- Find the rule for each non shifted site
     let rules = map2 (
@@ -241,7 +265,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
         ) used_points (indices used_points)
 
     -- in shp
-    in (shp, sc_shp_exclusive, rules, f_idx, is_shifted)
+    in (shp, sc_shp_exclusive, rules, f_idx, H)
 
 -- ==
 -- compiled random input {       [1000][2]f64 } 
@@ -265,9 +289,9 @@ def main [n]
 
     -- in length triangles 
     --in map (\i -> [triangles[i].0, triangles[i].1,triangles[i].2]) <| indices triangles
-    -- in  (shiftSites triangles used scaled_points scaled_points_grid)
+    in  (shiftSites triangles used scaled_points scaled_points_grid)
     -- in reduce (i64.max) 0 shps
-    in triangleGrid grid voronoi_diagram triangles scaled_points_grid
+    -- in triangleGrid grid voronoi_diagram triangles scaled_points_grid
 
 -- > :img main ($loaddata "test_data10.txt")
 
@@ -277,7 +301,7 @@ def main [n]
 
 
 -- Mål:
--- Lav noget parallelt til C2, som mulgivis kun håndtere 1 af deres 9 tilfælde.
+-- Lav noget parallelt til C2, som muligvis kun håndtere 1 af deres 9 tilfælde.
 
 
 -- Cs: Jeg burde bruge lave et 'greedy' prøv at løs så mange ting som muligt. Se om der er konflikter og prøv igen approach approach
