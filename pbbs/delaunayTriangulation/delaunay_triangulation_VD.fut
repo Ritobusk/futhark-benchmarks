@@ -12,27 +12,20 @@ def movePointsToGrid [n] (points : [n][2]f64) (grid_size : i64) : ([grid_size][g
     let pointsT = transpose points  
     let mins = map (reduce_comm f64.min f64.highest) pointsT
     let maxs = map (reduce_comm f64.max f64.lowest ) pointsT 
-    let largest_min = f64.minimum mins -- Pushes the points towards the first quodrant
+    let smallest_min = f64.minimum mins -- Pushes the points towards the first quodrant
 
     let x_scale = ((f64.i64 grid_size - 1) / (f64.max (f64.abs mins[0]) (f64.abs maxs[0])))
     let y_scale = ((f64.i64 grid_size - 1) / (f64.max (f64.abs mins[1]) (f64.abs maxs[1])))
     let scale   = f64.min x_scale y_scale 
 
-    let (scaled_points, scaled_points_grid) = transpose pointsT
-        |> map (\cc -> map (\c -> 
-            let sp =(c - largest_min) * scale
-            in (sp, i64.f64 <| f64.round <| sp)  ) cc) 
-        |> map (unzip)    
-        |> unzip
+    let (scaled_points, scaled_points_grid, scaled_points_flat_idx) = transpose pointsT
+        |> map (\cc -> 
+            let x =(cc[0] - smallest_min) * scale
+            let y =(cc[1] - smallest_min) * scale
+            let gp = [i64.f64 <| f64.round x, i64.f64 <| f64.round y] 
+            in ([x, y], gp, gp[0] + gp[1] * grid_size) 
+        ) |> (unzip3)     
         
-    -- let scaled_points_not_rounded = map (\cc -> map (\c -> (c - largest_min) * scale ) cc) <| transpose pointsT 
-
-    let scaled_points_flat_idx =  map (\cc -> 
-        let x = (i64.f64 <| f64.round <| (cc[0] - largest_min) * scale )   
-        let y = grid_size * (i64.f64 <| f64.round <| (cc[1] - largest_min) * scale )
-        in x + y
-    ) <| transpose pointsT
-
     let (grid, used, unused) = populateGrid (grid_size * grid_size) scaled_points_flat_idx (indices points)
     let grid = unflatten grid
     in (grid, used, unused, scaled_points, scaled_points_grid)
@@ -45,8 +38,7 @@ def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : 
     let stencil_1 = stencilK 1
     let plus_1 = tabulate_2d grid_size grid_size 
         (\r c ->
-            if grid[r][c] != -1 then
-                (0f64, grid[r][c])
+            if grid[r][c] != -1 then (0f64, grid[r][c])
             else
                 loop (d, ind) =  (f64.highest, -1) for (i,j) in stencil_1 do
                     let (r', c') = (r + i, c + j)
@@ -89,7 +81,7 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
                 (\r c ->
                     let (site_r, site_c) = (points[g[r][c].1][1], points[g[r][c].1][0])
                     let rule = findQuodrantOrAxis (r,c) (site_r, site_c) grid_size
-                    let tmp = 
+                    in 
                         if      rule == #center then (g[r][c], false)
                         else if rule == #up    && g[r-1][c].1 == g[r][c].1                                            then (g[r][c], false)
                         else if rule == #down  && g[r+1][c].1 == g[r][c].1                                            then (g[r][c], false)
@@ -119,7 +111,6 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
                                             ((d, ind), island_flag)
                                     else
                                         ((d, ind), island_flag)
-                    in tmp
                 )
             -- Check if any islands where found. If so we loop again!
             -- let cond' = trace <| reduce (\acc f -> f && acc) false (island_flag_array)
@@ -193,6 +184,7 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
 
 
 def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i64) (points : [n][2]f64) (grid_points : [n][2]i64) =
+    let test = map (\i -> [i.0, i.1, i.2]) triangles
     -- Seems like the maximum number of triangles in a fan is around 15 for the 1m dataset
     -- This means the loop that should be made might only need 15 iterations.
     let triangle_fans = map (\ts -> [(ts.0, ts), (ts.1, ts), (ts.2, ts)]) triangles
@@ -201,7 +193,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 
     let flag_arr = map2 (
         \(f, _) i ->  
-            if i + 1 < (length triangle_fans) then (f != triangle_fans[i+1].0) |> i32.bool 
+            if i  > 0  then (f != triangle_fans[i-1].0) |> i32.bool 
             else 0i32 
         ) triangle_fans (indices triangle_fans)
     let f_idx = scan (+) 0 flag_arr
@@ -222,7 +214,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 
 
 
-    let is_shifted = (replicate (n) false ) with [0] = true
+    let is_shifted = (replicate (n) false ) --with [0] = true
 
 
     -- Do heuristic before I compute the rules to see whether or not a site should be
@@ -237,7 +229,6 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 
     let f_site_tri  = map (\tf -> replicate 3 tf.0) triangle_fans 
                     |> flatten
-    -- Maybe instead of site being highest f_triangles should be -1 such that they are ignored.
     let H = hist i32.min (i32.i64 n) (n) f_triangles f_site_tri
 
     -- let valid_sites = map2 (\i j ->
@@ -270,7 +261,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
         ) used_points (indices used_points)
 
     -- in shp
-    in (shp, sc_shp_exclusive, rules, f_idx, H)
+    in (shp, sc_shp_exclusive, flag_arr, f_idx, f_triangles, H, test)
 
 -- ==
 -- compiled random input {       [1000][2]f64 } 

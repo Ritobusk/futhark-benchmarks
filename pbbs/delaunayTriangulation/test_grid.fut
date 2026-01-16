@@ -1,5 +1,6 @@
 import "lib/github.com/diku-dk/sorts/radix_sort"
 import "delaunay_triangulation_VD"
+import "util"
 
 def movePointsToGrid1 [n] (points : [n][2]f64) (grid_size : i64) : ([grid_size][grid_size]i32, []i64, [n][2]i64) =
 
@@ -50,14 +51,14 @@ entry main2 [n]
     (points : [n][2]f64)  =
     let grid_size = 1024
 
-    let (grid', unused', scaled_points') = movePointsToGrid points grid_size
+    let (grid', used, unused', scaled_points', spg)  = movePointsToGrid points grid_size
     in grid'
 
 entry test [n]
     (points : [n][2]f64)  =
     let grid_size = 1024
     let (grid, unused, scaled_points) = movePointsToGrid1 points grid_size
-    let (grid', unused', scaled_points') = movePointsToGrid2 points grid_size
+    let (grid', used, unused', sp, scaled_points') = movePointsToGrid points grid_size
     let grid = flatten grid
     let grid' = flatten grid'
     let g_flag = map2 (==) grid grid'
