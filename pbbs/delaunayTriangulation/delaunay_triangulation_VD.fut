@@ -273,28 +273,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
             let rules = trace rules
             in (tfans, shp, is_shifted'')
 
-    -- Find the rule for each non shifted site
-    -- let rules = map2 (
-    --     \up i -> 
-    --         if !is_shifted[up] then
-    --             let fan =  map (\j -> triangle_fans[j + sc_shp_ex[i]].1) (iota shp[i])
-    --             let p   = points[up]
-    --             let is_in_fan = map (\tr -> 
-    --                     let t1 = if is_shifted[tr.0] then points[tr.0] else map (f64.i64) grid_points[tr.0]
-    --                     let t2 = if is_shifted[tr.1] then points[tr.1] else map (f64.i64) grid_points[tr.1]
-    --                     let t3 = if is_shifted[tr.2] then points[tr.2] else map (f64.i64) grid_points[tr.2]
-    --                     in pointInTriangle t1 t2 t3 p
-    --                 ) fan 
-    --                 |> reduce (||) false
-    --             -- Check if inside triangle fan
-    --             -- If yes then rule 1
-    --             -- else check :
-    --             in i64.bool is_in_fan
-    --         else -1
-    --
-    --     ) used_points (indices used_points)
 
-    -- in shp
     in (shp, is)
 
 
