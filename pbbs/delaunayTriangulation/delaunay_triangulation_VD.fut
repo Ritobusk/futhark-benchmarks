@@ -209,69 +209,69 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
                 ) (indices flag_arr) 
         |> filter (>0)
 
-    let sc_shp = scan (+) 0 shp
-    let sc_shp_ex = (rotate (-1) sc_shp) with [0] = 0 
-    let sites = map (\i -> triangle_fans[i].0) sc_shp_ex
-
-
-
     let is_shifted = (replicate (n) false ) --with [0] = true
 
-
-    -- Do heuristic before I compute the rules to see whether or not a site should be
-    --   computed
-    -- This is done with a hist (min)   on the fans such that each site will have 
-    --  the smallest indices of a site that is part of some fan 
-    
-    let flat_triangles = map (\tf -> 
-            if is_shifted[tf.0] then [-1, -1, -1] -- indices that are ignored
-            else map (i64.i32) [tf.1.0,tf.1.1,tf.1.2]
-        ) triangle_fans |> flatten
-
-    let f_site_tri  = map (\tf -> replicate 3 tf.0) triangle_fans 
-                    |> flatten
-    let H = hist i32.min (i32.i64 n) (n) flat_triangles f_site_tri
-
     -- Compute valid sites
-    --    From flat_triangles take [shp_exc[i:i+1]]
-    --    Map (are they all equal to main site?)
-    -- Compute rules 
-    -- 
-    let valid_sites = map2 (\i site ->
-        if is_shifted[i] then (false, site, i)
-        else
-            let s = sc_shp_ex[i] * 3
-            let e = sc_shp[i] * 3
-            let indices = flat_triangles[s:e]
-            let test    = map (\ii -> H[ii] == site) indices
-                    |> reduce (&&) true
+    -- Compute rules for valid sites
+    -- Update fan ??
+    -- call next iteration
+    let (fan, shp, is) =
+        loop (tfans, shp, is_shifted') = (triangle_fans, shp, is_shifted)
+        while !(reduce (&&) true is_shifted') do
 
-            in (test, site, i)
+            let sc_shp = scan (+) 0 shp
+            let sc_shp_ex = (rotate (-1) sc_shp) with [0] = 0 
+            let sites = map (\i -> tfans[i].0) sc_shp_ex
 
-        ) (indices sc_shp_ex) sites 
-        
-        |> filter (.0)
-        |> map (\vs -> (vs.1, vs.2))
+            -- Do heuristic before I compute the rules with hist 
+            let flat_triangles = map (\tf -> 
+                    if is_shifted'[tf.0] then [-1, -1, -1] -- indices that are ignored
+                    else map (i64.i32) [tf.1.0,tf.1.1,tf.1.2]
+                ) tfans |> flatten
 
-    -- Find the rule for each non shifted site
-    let rules = map (
-        \(site, i) -> 
-            let s = sc_shp_ex[i]
-            let e = sc_shp[i]
-            let fan = map (.1) triangle_fans[s:e]
-            let p   = points[site]
-            let is_in_fan = map (\tr -> 
-                    let t1 = if is_shifted[tr.0] then points[tr.0] else map (f64.i64) grid_points[tr.0]
-                    let t2 = if is_shifted[tr.1] then points[tr.1] else map (f64.i64) grid_points[tr.1]
-                    let t3 = if is_shifted[tr.2] then points[tr.2] else map (f64.i64) grid_points[tr.2]
-                    in pointInTriangle t1 t2 t3 p
-                ) fan 
-                |> reduce (||) false
-            -- Check if inside triangle fan
-            -- If yes then rule 1
-            -- else check :
-            in i64.bool is_in_fan
-        ) valid_sites
+            let f_site_tri  = map (\tf -> replicate 3 tf.0) tfans 
+                            |> flatten
+            let H = hist i32.min (i32.i64 n) (n) flat_triangles f_site_tri
+            let H = trace H
+
+            let valid_sites = map2 (\i site ->
+                if is_shifted'[i] then (false, site, i)
+                else
+                    let s = sc_shp_ex[i] * 3 -- *3 because indx for 
+                    let e = sc_shp[i] * 3    --  flat_triangles
+                    let indices = flat_triangles[s:e]
+                    let test    = map (\ii -> H[ii] == site) indices
+                            |> reduce (&&) true
+                    in (test, site, i)
+                ) (indices sc_shp_ex) sites 
+                |> filter (.0)
+                |> map (\vs -> (vs.1, vs.2))
+
+            -- Find the rule for each non shifted site
+            let rules = map (
+                \(site, i) -> 
+                    let s = sc_shp_ex[i]
+                    let e = sc_shp[i]
+                    let fan = map (.1) triangle_fans[s:e]
+                    let p   = points[site]
+                    let is_in_fan = map (\tr -> 
+                            let t1 = if is_shifted'[tr.0] then points[tr.0] else map (f64.i64) grid_points[tr.0]
+                            let t2 = if is_shifted'[tr.1] then points[tr.1] else map (f64.i64) grid_points[tr.1]
+                            let t3 = if is_shifted'[tr.2] then points[tr.2] else map (f64.i64) grid_points[tr.2]
+                            in pointInTriangle t1 t2 t3 p
+                        ) fan 
+                        |> reduce (||) false
+                    -- Check if inside triangle fan
+                    -- If yes then rule 1
+                    -- else check :
+                    in i64.bool is_in_fan
+                ) valid_sites
+
+            let update_vals  = replicate (length rules) true
+            let id_to_update = sized (length rules) (map (.1) valid_sites)
+            let is_shifted''   = scatter is_shifted' (id_to_update) update_vals
+            let rules = trace rules
+            in (tfans, shp, is_shifted'')
 
     -- Find the rule for each non shifted site
     -- let rules = map2 (
@@ -295,7 +295,8 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
     --     ) used_points (indices used_points)
 
     -- in shp
-    in (shp, sc_shp_ex, flag_arr, f_idx, flat_triangles, H, test, rules)
+    in (shp, is)
+
 
 -- ==
 -- compiled random input {       [1000][2]f64 } 
