@@ -13,7 +13,7 @@ def GPU_STEPS [n]
     -- let t =trace scaled_points
     -- let (t4, t10) = trace (grid, unused_p_flag)
 
-    let grid' = voronoiDiagram  grid  scaled_points_grid
+    let grid' = voronoiDiagram2  grid  scaled_points_grid
     let grid''  = removeIslands grid' scaled_points_grid
     let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid''[i][j].1) 
     let voronoi_vertices = locateVoronoiVertices voronoi_diagram 

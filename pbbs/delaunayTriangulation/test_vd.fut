@@ -37,10 +37,10 @@ def voronoiDiagram2 [grid_size] [n] (grid : [grid_size][grid_size]i32) (points :
                     in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
                         (f64.highest, -1)
                     else
-                        let d' = dist (f64.i64 c,f64.i64 r) (f64.i64 c',f64.i64 r')
                         let ind' = grid[r'][c']
                         in if ind' != -1 then
-                            (d', ind')
+                            let d' = dist (f64.i64 c,f64.i64 r) (f64.i64 c',f64.i64 r')
+                            in (d', ind')
                         else
                             (f64.highest, -1)
                     ) stencil_1
@@ -48,42 +48,67 @@ def voronoiDiagram2 [grid_size] [n] (grid : [grid_size][grid_size]i32) (points :
         )
 
     -- in plus_1   
-    in loop g = plus_1 for iteration < (log2Int grid_size) + 1 do
-        let stencil_it = trace <|stencilK (grid_size / (2**(iteration+1)))
+    in loop g = plus_1 for iteration < (log2Int grid_size) do
+        let stencil_it = stencilK (grid_size / (2**(iteration+1)))
         in tabulate_2d grid_size grid_size 
             (\r c ->
-                map (\(si, sj) ->
+                let (d, ind) = (g[r][c].0, g[r][c].1)
+                in map (\(si, sj) ->
                     let (r', c') = (r + si, c + sj)
                     in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
-                        (f64.highest, -1)
+                        (d, ind)
                     else
-                        let ind' = grid[r'][c']
+                        let ind' = g[r'][c'].1
                         in if ind' != -1 then
                             let d' = dist (f64.i64 c,f64.i64 r) (f64.i64 points[g[r'][c'].1][0], f64.i64 points[g[r'][c'].1][1])
-                            in (d', ind')
+                            in if d' < d then (d', ind') else (d, ind)
                         else
-                            (f64.highest, -1)
+                            (d, ind)
                     ) stencil_it
                 |> reduce (\acc x -> if x.0 < acc.0 then x else acc ) (g[r][c].0, g[r][c].1)
             )
+
+    -- in loop g = plus_1 for iteration < (log2Int grid_size) do
+    --     let stencil_it = stencilK (grid_size / (2**(iteration+1)))
+    --     in tabulate_2d grid_size grid_size 
+    --         (\r c ->
+    --             loop (d, ind) =  (g[r][c].0, g[r][c].1) for (i,j) in stencil_it do
+    --                 let (r', c') = (r + i, c + j)
+    --                 in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
+    --                     (d, ind)
+    --                 else 
+    --                     let ind' = g[r'][c'].1
+    --                     in if ind' != -1  then
+    --                         let d' = dist (f64.i64 c,f64.i64 r) (f64.i64 points[g[r'][c'].1][0], f64.i64 points[g[r'][c'].1][1])
+    --                         in if d' < d then
+    --                             (d', ind')
+    --                         else
+    --                             (d, ind)      
+    --                     else
+    --                         (d, ind)
+    --         )
 
 -- ==
 -- entry: main test
 -- compiled random input {       [100][2]f64 } 
 def main [n]
     (points : [n][2]f64)  =
-    let grid_size = 16
+    let grid_size = 10
     let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
 
+    let scaled_points_grid = scaled_points_grid
     let grid2 = voronoiDiagram2  grid  scaled_points_grid
     let grid1 = voronoiDiagram  grid  scaled_points_grid
-    let grid2' = map (\r -> map (.1) r) grid2 |> flatten 
-    let grid1' = map (\r -> map (.1) r) grid1 |> flatten 
+    let grid2' = map (\r -> map (.1) r) grid2 
+    let grid1' = map (\r -> map (.1) r) grid1 
+    -- let grid2' = map (\r -> map (.1) r) grid2 |> flatten 
+    -- let grid1' = map (\r -> map (.1) r) grid1 |> flatten 
     -- let grid1 = map (.1) grid1 |> flatten 
     let g_flag = map2 (==) grid2' grid1'
+        |> and
         
 
-    in (grid2', grid1')
+    in g_flag
     -- in (g_flag, grid2)
     -- let grid_size = 1024  --/ 32
     --

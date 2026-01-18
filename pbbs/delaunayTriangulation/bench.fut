@@ -1,20 +1,22 @@
 import "delaunay_triangulation_VD"
 
 -- ==
--- entry: g1 g2 g3 g4 g5
+-- entry: g1 g2 
 -- compiled random input {       [1000][2]f64 } 
 -- compiled random input {      [10000][2]f64 } 
 -- compiled random input {    [1000000][2]f64 } 
 -- compiled random input {   [10000000][2]f64 } 
 entry g1 [n]
     (points : [n][2]f64)  =
-    let grid_size = 4096
+    let grid_size = 2048
     let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
-    in (grid, used, unused, scaled_points, scaled_points_grid)
+    let grid' = voronoiDiagram2  grid  scaled_points_grid
+    in grid'
+    -- in (grid, used, unused, scaled_points, scaled_points_grid)
 
 entry g2 [n]
     (points : [n][2]f64)  =
-    let grid_size = 4096
+    let grid_size = 2048
     let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
     let grid' = voronoiDiagram  grid  scaled_points_grid
     in grid'

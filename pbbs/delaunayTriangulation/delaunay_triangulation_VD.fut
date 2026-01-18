@@ -30,6 +30,48 @@ def movePointsToGrid [n] (points : [n][2]f64) (grid_size : i64) : ([grid_size][g
     let grid = unflatten grid
     in (grid, used, unused, scaled_points, scaled_points_grid)
 
+def voronoiDiagram2 [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f64, i32)) =
+    let stencil_1 = stencilK 1
+    let plus_1 = tabulate_2d grid_size grid_size 
+        (\r c ->
+            if grid[r][c] != -1 then (0f64, grid[r][c])
+            else
+                map (\(si, sj) ->
+                    let (r', c') = (r + si, c + sj)
+                    in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
+                        (f64.highest, -1)
+                    else
+                        let ind' = grid[r'][c']
+                        in if ind' != -1 then
+                            let d' = dist (f64.i64 c,f64.i64 r) (f64.i64 c',f64.i64 r')
+                            in (d', ind')
+                        else
+                            (f64.highest, -1)
+                    ) stencil_1
+                |> reduce (\acc x -> if x.0 < acc.0 then x else acc ) (f64.highest, -1)
+        )
+
+    -- in plus_1   
+    in loop g = plus_1 for iteration < (log2Int grid_size) do
+        let stencil_it = stencilK (grid_size / (2**(iteration+1)))
+        in tabulate_2d grid_size grid_size 
+            (\r c ->
+                let (d, ind) = (g[r][c].0, g[r][c].1)
+                in map (\(si, sj) ->
+                    let (r', c') = (r + si, c + sj)
+                    in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
+                        (d, ind)
+                    else
+                        let ind' = g[r'][c'].1
+                        in if ind' != -1 then
+                            let d' = dist (f64.i64 c,f64.i64 r) (f64.i64 points[g[r'][c'].1][0], f64.i64 points[g[r'][c'].1][1])
+                            in if d' < d then (d', ind') else (d, ind)
+                        else
+                            (d, ind)
+                    ) stencil_it
+                |> reduce (\acc x -> if x.0 < acc.0 then x else acc ) (g[r][c].0, g[r][c].1)
+            )
+
 def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [n][2]i64)  : ([grid_size][grid_size](f64, i32)) =
     -- G2
     -- I use a tuple grid to represent for each pixel both the distance to the closest encountered site, 

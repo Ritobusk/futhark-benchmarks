@@ -5,11 +5,6 @@ def populateGrid [k] 't (n: i64) (is: [k]i64) (xs: [k]t) : ([n]i32, []t, []t) =
         |> zip xs
         |> partition (.1)
     in (grid', map (.0) used, map (.0) unused)
-        -- |> map (.0)
-    -- let unused  = zip xs unused
-    -- let unused  = partition (.1) unused
-    -- let unused = unused.1
-    -- let unused = map (.0) unused
 
 def sgmscan 't [n] (op: t->t->t) (ne: t)
                    (flg : [n]i32) (arr : [n]t) : [n]t =
