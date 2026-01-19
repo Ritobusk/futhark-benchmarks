@@ -1,13 +1,13 @@
 import "util"
 import "delaunay_triangulation_VD"
 
--- > :img GPU_STEPS ($loaddata "test_data1t.txt")
+-- > :img GPU_STEPS ($loaddata "test_data10.txt")
 
--- > :img GPU_STEPS_AND_C1 ($loaddata "test_data1t.txt")
+-- > :img GPU_STEPS_AND_C1 ($loaddata "test_data25.txt")
 
 def GPU_STEPS [n]
     (points : [n][2]f64)  =
-    let grid_size = 1024 
+    let grid_size = 512 
 
     let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
     -- let t =trace scaled_points
@@ -25,7 +25,7 @@ def GPU_STEPS [n]
 
 def GPU_STEPS_AND_C1 [n]
     (points : [n][2]f64)  =
-    let grid_size = 1024
+    let grid_size = 512
 
     let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
 

@@ -30,7 +30,7 @@ def pack lte xs =
   zip3 (indices xs) xs (rotate (-1) xs)
   |> filter (\(i,x,y) -> i == 0 || neq lte x y) |> map (.1)
 
-def pack_points_i64 = pack_and_partition (i64.<=)
+def pack_points_i64 = pack(i64.<=)
 def pack_points_i32 = pack (i32.<=)     
 
 
