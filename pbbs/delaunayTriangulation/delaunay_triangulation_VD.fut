@@ -257,8 +257,8 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
     -- Compute rules for valid sites
     -- Update fan ??
     -- call next iteration
-    let (fan, shp, is) =
-        loop (tfans, shp, is_shifted') = (triangle_fans, shp, is_shifted)
+    let (fan, shp, is, r') =
+        loop (tfans, shp, is_shifted', r) = (triangle_fans, shp, is_shifted, [])
         while !(reduce (&&) true is_shifted') do
 
             let sc_shp = scan (+) 0 shp
@@ -266,6 +266,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
             let sites = map (\i -> tfans[i].0) sc_shp_ex
 
             -- Do heuristic before I compute the rules with hist 
+            -- Seems like there is some bug where the shifted '-1' are read from...
             let flat_triangles = map (\tf -> 
                     if is_shifted'[tf.0] then [-1, -1, -1] -- indices that are ignored
                     else map (i64.i32) [tf.1.0,tf.1.1,tf.1.2]
@@ -290,33 +291,63 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
                 |> map (\vs -> (vs.1, vs.2))
 
             -- Find the rule for each non shifted site
+            -- These map to the 3 scenarios from the paper:
+            -- 1: in the original fan
+            -- 2: In another fan
+            -- 3: Outside mesh
             let rules = map (
                 \(site, i) -> 
                     let s = sc_shp_ex[i]
                     let e = sc_shp[i]
-                    let fan = map (.1) triangle_fans[s:e]
+                    let fan = map (.1) tfans[s:e]
                     let p   = points[site]
-                    let is_in_fan = map (\tr -> 
+                    -- let is_in_fan = map (\tr -> 
+                    --         let t1 = if is_shifted'[tr.0] then points[tr.0] else map (f64.i64) grid_points[tr.0]
+                    --         let t2 = if is_shifted'[tr.1] then points[tr.1] else map (f64.i64) grid_points[tr.1]
+                    --         let t3 = if is_shifted'[tr.2] then points[tr.2] else map (f64.i64) grid_points[tr.2]
+                    --         in pointInTriangle t1 t2 t3 p
+                    --     ) fan 
+                    --     |> reduce (||) false
+                    let in_fan_min_dist = map (\tr -> 
                             let t1 = if is_shifted'[tr.0] then points[tr.0] else map (f64.i64) grid_points[tr.0]
                             let t2 = if is_shifted'[tr.1] then points[tr.1] else map (f64.i64) grid_points[tr.1]
                             let t3 = if is_shifted'[tr.2] then points[tr.2] else map (f64.i64) grid_points[tr.2]
-                            in pointInTriangle t1 t2 t3 p
+                            in pointInTriangleAndDist t1 t2 t3 p [tr.0,tr.1,tr.2]
                         ) fan 
-                        |> reduce (||) false
+                    let is_in_fan = map (.0) in_fan_min_dist |> reduce (||) false
+                    in if is_in_fan then i64.bool is_in_fan
+                    else 
+                        let closest_point = map (.1) in_fan_min_dist 
+                            |> reduce (\acc x -> if x.1 < acc.1 then x else acc) (-1i32, f64.highest)
+                            |> (.0)
+                        let j = binary_search closest_point sites
+                        let s = sc_shp_ex[j]
+                        let e = sc_shp[j]
+                        let fan = map (.1) tfans[s:e]
+                        let p   = points[closest_point]
+                        let is_in_fan = map (\tr -> 
+                                let t1 = if is_shifted'[tr.0] then points[tr.0] else map (f64.i64) grid_points[tr.0]
+                                let t2 = if is_shifted'[tr.1] then points[tr.1] else map (f64.i64) grid_points[tr.1]
+                                let t3 = if is_shifted'[tr.2] then points[tr.2] else map (f64.i64) grid_points[tr.2]
+                                in pointInTriangle t1 t2 t3 p
+                            ) fan 
+                            |> reduce (||) false
+                        in if is_in_fan then 2i64 else 3i64
+                        
                     -- Check if inside triangle fan
                     -- If yes then rule 1
                     -- else check :
-                    in i64.bool is_in_fan
+                    -- in i64.bool is_in_fan
                 ) valid_sites
 
             let update_vals  = replicate (length rules) true
             let id_to_update = sized (length rules) (map (.1) valid_sites)
             let is_shifted''   = scatter is_shifted' (id_to_update) update_vals
             let rules = trace rules
-            in (tfans, shp, is_shifted'')
+            in (tfans, shp, is_shifted'', rules)
 
 
-    in (shp, is)
+    in (shp, is, r')
 
 
 -- ==
@@ -329,7 +360,7 @@ def main [n]
 
     let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
 
-    let grid' = voronoiDiagram  grid  scaled_points_grid
+    let grid' = voronoiDiagram2  grid  scaled_points_grid
     let grid''  = removeIslands grid' scaled_points_grid
     let voronoi_diagram = tabulate_2d grid_size grid_size (\i j -> grid''[i][j].1) 
     let voronoi_vertices = locateVoronoiVertices voronoi_diagram 

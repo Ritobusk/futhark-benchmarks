@@ -1,9 +1,9 @@
 import "util"
 import "delaunay_triangulation_VD"
 
--- > :img GPU_STEPS ($loaddata "test_data10.txt")
+-- > :img GPU_STEPS ($loaddata "test_data1t.txt")
 
--- > :img GPU_STEPS_AND_C1 ($loaddata "test_data10.txt")
+-- > :img GPU_STEPS_AND_C1 ($loaddata "test_data1t.txt")
 
 def GPU_STEPS [n]
     (points : [n][2]f64)  =

@@ -34,6 +34,14 @@ def pack_points_i64 = pack_and_partition (i64.<=)
 def pack_points_i32 = pack (i32.<=)     
 
 
+def dist (p : (f64, f64)) (q: (f64, f64)) : f64 =
+    f64.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
+
+def disti64 (p : (i64, i64)) (q: (i64, i64)) : f64 =
+    let p = (f64.i64 p.0, f64.i64 p.1)
+    let q = (f64.i64 q.0, f64.i64 q.1)
+    in f64.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
+
 -- sign and point in triangle taken from https://stackoverflow.com/a/2049593
 def sign (p1 : [2]f64) (p2 : [2]f64) (p3 : [2]f64)  : f64 =
     (p1[0] - p3[0]) * (p2[1] - p3[1]) - (p2[0] - p3[0]) * (p1[1] - p3[1])
@@ -47,30 +55,29 @@ def pointInTriangle (p1 : [2]f64) (p2 : [2]f64) (p3 : [2]f64) (q : [2]f64) : boo
     let has_pos = (d1 > 0f64) || (d2 > 0f64) || (d3 > 0f64)
     in !(has_neg && has_pos)
 
+def pointInTriangleAndDist (p1 : [2]f64) (p2 : [2]f64) (p3 : [2]f64) (q : [2]f64) (tr_ids : [3]i32) : (bool, (i32, f64)) =
+    let d1 = sign q p1 p2
+    let d2 = sign q p2 p3
+    let d3 = sign q p3 p1
+    let dist_min = map (\x -> dist (x[0], x[1]) (q[0], q[1])) [p1, p2, p3] 
+        |> zip tr_ids
+    let dist_min = reduce (\acc x -> if x.1 < acc.1 then x else acc) (-1i32, f64.highest) dist_min
     
--- bool PointInTriangle (fPoint pt, fPoint v1, fPoint v2, fPoint v3)
--- {
---     float d1, d2, d3;
---     bool has_neg, has_pos;
---
---     d1 = sign(pt, v1, v2);
---     d2 = sign(pt, v2, v3);
---     d3 = sign(pt, v3, v1);
---
---     has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
---     has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
---
---     return !(has_neg && has_pos);
--- }
+    let has_neg = (d1 < 0f64) || (d2 < 0f64) || (d3 < 0f64)
+    let has_pos = (d1 > 0f64) || (d2 > 0f64) || (d3 > 0f64)
+    in (!(has_neg && has_pos), dist_min)
+    
+def binary_search [k] (p_id : i32) (sites : [k]i32) : i64 =
+    let (_, k', _) = loop (depth, s, cond) = (1i64, 0i64, true) while cond do 
+        let t = sites[s]
+        in if t == p_id then
+            (depth, s, false)
+        else if ( t) < p_id then 
+            (depth +1, s + (i64.max 1 (k/ (2**depth))), true)
+        else 
+            (depth +1, s - (i64.max 1 (k/ (2**depth))), true)
+    in k'
 
-
-def dist (p : (f64, f64)) (q: (f64, f64)) : f64 =
-    f64.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
-
-def disti64 (p : (i64, i64)) (q: (i64, i64)) : f64 =
-    let p = (f64.i64 p.0, f64.i64 p.1)
-    let q = (f64.i64 q.0, f64.i64 q.1)
-    in f64.sqrt ((p.0 - q.0)**2 + (p.1 - q.1)**2)
 
 def normalizei64 (p : (i64,i64)) : (f64, f64) =
     let p = (f64.i64 p.0, f64.i64 p.1)
