@@ -184,10 +184,9 @@ def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][
 def createTriangles [m] (voronoi_diagram : [m][m]i32) (voronoi_vertices : [m-2][m-2]i32) : [](i32, i32, i32) =
     -- G5 and G6
     let fvv = flatten voronoi_vertices
-    let fvv_ids = scan (+) 0i32 fvv
-    let vv_idxs = map (\x -> if x.1 > 0 then (x.0, x.2) else (-1, 0) ) <| zip3 fvv_ids fvv (indices fvv)
-    let vv_idxs' = filter (\x -> if x.0 < 0 then false else true) vv_idxs
-    let num_ts   =  i64.i32 <| 2*(last fvv_ids)
+    let vv_idxs = map (\x -> if x.0 > 0 then (true, x.1) else (false, 0) ) <| zip fvv (indices fvv)
+    let vv_idxs' = filter (\x -> x.0 ) vv_idxs
+    let num_ts   =   2*(length vv_idxs')
     in  filter (\x -> x.0 >= 0) 
         <| map (\i -> 
             let j = vv_idxs'[i/2].1
@@ -228,8 +227,9 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
 def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i64) (points : [n][2]f64) (grid_points : [n][2]i64) =
     -- Bug: Somehow triangle_fans and used_points are a bit different
     -- Works on 1m dataset.... but not on 100t and 90t where shp length was off by 1 with p
-    --  on 10m dataset it was off by 34
-    --  on 10m dataset it finished when the 
+    --  on 10m dataset it finished
+    --  I don't know exactly how you should set the radix_sort_int_by_key num_bits for this. 
+    --    It seems like you need to overshoot what I expected it to be (I expected: log2 n  + 1)
     let triangle_fans = map (\ts -> [(ts.0, ts), (ts.1, ts), (ts.2, ts)]) triangles
         |> flatten
         |> radix_sort_int_by_key (\(i, _) -> i) (32i32) i32.get_bit
@@ -284,14 +284,14 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
             let valid_sites = map2 (\site i ->
                 if is_shifted'[used_points[i]] then (false, site, i)
                 else
-                    let s = sc_shp_ex[i]  -- *3 because indx for 
-                    let e = sc_shp[i]     --  flat_triangles
+                    let s = sc_shp_ex[i]  
+                    let e = sc_shp[i]     
                     let indices = map (\x -> [x.1.0, x.1.1,x.1.2]) tfans[s:e] |> flatten
-                    let test    = map (\ii -> H[ii] ) indices
-                    let test    = map (\ii -> ii == site ) test
-                    let test    = reduce (&&) true test
-                    -- let test    = map (\ii -> H[ii] == site || H[ii] == (i32.i64 n)) indices
-                    --         |> reduce (&&) true
+                    -- let test    = map (\ii -> H[ii] ) indices
+                    -- let test    = map (\ii -> ii == site ) test
+                    -- let test    = reduce (&&) true test
+                    let test    = map (\ii -> H[ii] == site || H[ii] == (i32.i64 n)) indices
+                            |> reduce (&&) true
                     in (test, site, i)
                 ) sites (iota p) 
                 |> filter (.0)
@@ -373,27 +373,3 @@ def main [n]
     -- in triangleGrid grid voronoi_diagram triangles scaled_points_grid
 
 -- > :img main ($loaddata "test_data10.txt")
-
--- Comments/ToDo
--- Tjek G3
--- Gør C1 hurtig
-
-
--- Mål:
--- Lav noget parallelt til C2, som muligvis kun håndtere 1 af deres 9 tilfælde.
-
-
--- Cs: Jeg burde bruge lave et 'greedy' prøv at løs så mange ting som muligt. Se om der er konflikter og prøv igen approach approach
-
--- C1: Man kan map |> removeDuplicates, for at få boundry (Skal være i original order.) 
---     Muligvis ikke muligt at tjekke parallelt. I figur 5 se mørkegrøn, grå, lysegrøn.
-
--- C2: Det ligner jeg for hvert site også burde holde styr på dens edges. Ellers skal jeg søge efter alle trekanter, der indeholder et site.
---     Muligvis kan dette ikke lade sig gøre, da triangulationen kan ændre sig. Det vil betyde at man skal recalculate, nogle af sitesnes 
---      edges. Dette betyder, at hvis man vil have sitesne og deres 'fan' i et flat array, skal man for hver ændring recalculate size arrayet.
-
--- For hver trekant lav (x, (x,y,z)), (y, (x,y,z)), (z, (x,y,z))
--- derefter sorter efter første coordinat.
--- Så kan man få en flad repræsentation. 
-
--- C3: I G1 burde jeg returnerer et par af de unused, så man kan referere det ubrugte site til det brugte. 
