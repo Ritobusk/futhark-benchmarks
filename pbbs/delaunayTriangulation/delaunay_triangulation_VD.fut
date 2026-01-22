@@ -117,8 +117,8 @@ def voronoiDiagram [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : 
 
 def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (points : [n][2]i64) : [grid_size][grid_size](f64, i32) =
     let stencil_1 = stencilK 1
-    let (g'', _) = 
-        loop (g, cond) = (grid, true) while cond do 
+    let (g'', _, _) = 
+        loop (g, cond, iteration) = (grid, true, 0) while cond && iteration < 10 do 
             let (g', island_flag_array) =  unzip <| flatten <| tabulate_2d grid_size grid_size 
                 (\r c ->
                     let (site_r, site_c) = (points[g[r][c].1][1], points[g[r][c].1][0])
@@ -157,7 +157,7 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
                 )
             -- Check if any islands where found. If so we loop again!
             let cond' = trace <| or (island_flag_array)
-            in (unflatten g', cond')
+            in (unflatten g', cond', iteration + 1)
     in g''
 
 def locateVoronoiVertices [m] (grid : [m][m]i32) : [m-2][m-2]i32 = 
@@ -347,7 +347,7 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 -- compiled random input {   [10000000][2]f64 } 
 def main [n]
     (points : [n][2]f64)  =
-    let grid_size = 4024  --/ 32
+    let grid_size = 6024  --/ 32
 
     let (grid, used, _, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
 
