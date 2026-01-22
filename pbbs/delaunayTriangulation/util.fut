@@ -204,3 +204,13 @@ def triangleGrid [m] [k] [n] (grid : [m][m]i32) (voronoi_diagram : [m][m]i32) (t
                         colour_grid[r][c]
             )
     
+def voronoiAndPoints [m] (grid : [m][m]i32) (voronoi_diagram : [m][m]i32) = -- : [m][m]u32 =
+    let colour_grid = colours voronoi_diagram
+    in 
+        tabulate_2d m m
+            ( \r c ->
+                if grid[r][c] >= 0 then u32.highest
+                else
+                        colour_grid[r][c]
+            )
+    

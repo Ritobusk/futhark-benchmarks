@@ -137,7 +137,6 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
                         --Find new site to associate pixel with
                         else 
                             -- Find the closest point among the neighbours
-                            -- let t33 = trace (rule, r,c, g[r][c])
                             loop ((d, ind), island_flag) =  ((f64.highest, -1), true) for (i,j) in stencil_1 do
                                 let (r', c') = (r + i, c + j)
                                 in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
@@ -155,8 +154,7 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
                                         ((d, ind), island_flag)
                 )
             -- Check if any islands where found. If so we loop again!
-            -- let cond' = trace <| reduce (\acc f -> f && acc) false (island_flag_array)
-            let cond' = reduce (\acc f -> f && acc) false (island_flag_array)
+            let cond' = trace <| or (island_flag_array)
             in (unflatten g'', cond')
     in g''
 
@@ -168,8 +166,7 @@ def locateVoronoiVertices [m] (grid : [m][m]i32) : [m-2][m-2]i32 =
             in is_corner
         )
 
-def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]((i32, i32, i32),(i32, i32, i32)) = --: [m](i64, i64) =
-    -- tabulate_2d (grid_size - 2) (grid_size - 2) 
+def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][grid_size]i32) : [grid_size][grid_size]((i32, i32, i32),(i32, i32, i32)) =
     let trs =tabulate_2d (grid_size) (grid_size) 
         ( \r c ->
             if r == 0 || c == 0 || r == (grid_size -1) || c == (grid_size - 1) then ((-1,-1,-1),(-1,-1,-1))
@@ -178,7 +175,6 @@ def locateVoronoiVerticesAndCreateTriangulation [grid_size] (grid : [grid_size][
                  classifyVertexAndTriangulation grid[r][c+1] grid[r][c] grid[r+1][c] grid[r+1][c+1]
         )
 
-    -- let trs = filter  (\t -> t.0.0 > -1)  <| trs
     in trs
 
 def createTriangles [m] (voronoi_diagram : [m][m]i32) (voronoi_vertices : [m-2][m-2]i32) : [](i32, i32, i32) =
@@ -225,7 +221,7 @@ def fixConvexHull [grid_size] [n] (grid : [grid_size][grid_size]i32) (points : [
 
 
 def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i64) (points : [n][2]f64) (grid_points : [n][2]i64) =
-    -- Bug: Somehow triangle_fans and used_points are a bit different
+    -- Bug: Somehow triangle_fans and used_points are a bit different in size sometimes.
     -- Works on 1m dataset.... but not on 100t and 90t where shp length was off by 1 with p
     --  on 10m dataset it finished
     --  I don't know exactly how you should set the radix_sort_int_by_key num_bits for this. 
@@ -239,7 +235,6 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
             if i  > 0  then (f != triangle_fans[i-1].0) |> i32.bool 
             else 0i32 
         ) triangle_fans (indices triangle_fans)
-    let f_idx = scan (+) 0 flag_arr
 
     -- Might be faster with a scatter instead of filter
     --  Then use f_idx with a -1
@@ -264,8 +259,8 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
     -- Compute rules for valid sites
     -- Update fan ??
     -- call next iteration
-    let (fan, shp, is, r') =
-        loop (tfans, shp, is_shifted', r) = (triangle_fans, shp, is_shifted, [])
+    let (_, _, _, r') =
+        loop (tfans, shp, is_shifted', _) = (triangle_fans, shp, is_shifted, [])
         while !(reduce (&&) true is_shifted') do
 
             let sites = map (\i -> tfans[i].0) sc_shp_ex
@@ -336,9 +331,8 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
                 ) valid_sites
 
             let update_vals  = replicate (length valid_sites) true
-            let id_to_update = trace <|sized (length valid_sites) (map (\x -> used_points[x.1]) valid_sites)
+            let id_to_update = sized (length valid_sites) (map (\x -> used_points[x.1]) valid_sites)
             let is_shifted''   = scatter is_shifted' (id_to_update) update_vals
-            let rules = trace rules
             in (tfans, shp, is_shifted'', rules)
 
 
@@ -351,9 +345,9 @@ def shiftSites [t] [p] [n] (triangles : [t](i32, i32, i32)) (used_points : [p]i6
 -- compiled random input {   [10000000][2]f64 } 
 def main [n]
     (points : [n][2]f64)  =
-    let grid_size = 1024  --/ 32
+    let grid_size = 4024  --/ 32
 
-    let (grid, used, unused, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
+    let (grid, used, _, scaled_points, scaled_points_grid) = movePointsToGrid points grid_size
 
     let grid' = voronoiDiagram2  grid  scaled_points_grid
     let grid''  = removeIslands grid' scaled_points_grid
@@ -363,13 +357,8 @@ def main [n]
     -- G5 and G6
     let triangles = createTriangles voronoi_diagram voronoi_vertices
 
+    -- C1
     let triangles = (fixConvexHull voronoi_diagram scaled_points_grid) ++ triangles
 
-    -- in length triangles 
-    --in map (\i -> [triangles[i].0, triangles[i].1,triangles[i].2]) <| indices triangles
+    -- C2 partial
     in  (shiftSites triangles used scaled_points scaled_points_grid)
-    -- in (length used)
-    -- in reduce (i64.max) 0 shps
-    -- in triangleGrid grid voronoi_diagram triangles scaled_points_grid
-
--- > :img main ($loaddata "test_data10.txt")

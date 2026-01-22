@@ -3,7 +3,7 @@ import "delaunay_triangulation_VD"
 
 -- > :img GPU_STEPS ($loaddata "test_data10.txt")
 
--- > :img GPU_STEPS_AND_C1 ($loaddata "test_data25.txt")
+-- > :img GPU_STEPS_AND_C1 ($loaddata "test_data10.txt")
 
 def GPU_STEPS [n]
     (points : [n][2]f64)  =
@@ -21,6 +21,7 @@ def GPU_STEPS [n]
     -- G5 and G6
     let triangles = createTriangles voronoi_diagram voronoi_vertices
 
+    -- in voronoiAndPoints grid voronoi_diagram scaled_points_grid
     in triangleGrid grid voronoi_diagram triangles scaled_points_grid
 
 def GPU_STEPS_AND_C1 [n]
@@ -38,4 +39,5 @@ def GPU_STEPS_AND_C1 [n]
 
     let triangles = (fixConvexHull voronoi_diagram scaled_points_grid) ++ triangles
 
+    -- in voronoiAndPoints grid voronoi_diagram scaled_points_grid
     in triangleGrid grid voronoi_diagram triangles scaled_points_grid
