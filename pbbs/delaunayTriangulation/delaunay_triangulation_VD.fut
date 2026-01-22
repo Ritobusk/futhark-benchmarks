@@ -119,7 +119,7 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
     let stencil_1 = stencilK 1
     let (g'', _) = 
         loop (g, cond) = (grid, true) while cond do 
-            let (g'', island_flag_array) =  unzip <| flatten <| tabulate_2d grid_size grid_size 
+            let (g', island_flag_array) =  unzip <| flatten <| tabulate_2d grid_size grid_size 
                 (\r c ->
                     let (site_r, site_c) = (points[g[r][c].1][1], points[g[r][c].1][0])
                     let rule = findQuodrantOrAxis (r,c) (site_r, site_c) grid_size
@@ -141,13 +141,15 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
                                 let (r', c') = (r + i, c + j)
                                 in if r' < 0 || r' >= grid_size || c' < 0 || c' >= grid_size then
                                     ((d, ind), island_flag)
+                                else if ind < 0 then (g[r'][c'], true)
                                 else 
                                     let ind' = g[r'][c'].1
                                     let (site_r, site_c) = (points[ind'][1], points[ind'][0])
                                     in if ind' != -1  then
-                                        let d' = dist (f64.i64 r, f64.i64 c) (f64.i64 site_r, f64.i64 site_c)
+                                        let d' = trace <| dist (f64.i64 r, f64.i64 c) (f64.i64 site_r, f64.i64 site_c)
                                         in if d' < d then
-                                            ((d', ind'), island_flag)
+                                            let ind2 = ind'
+                                            in ((d', ind2), island_flag)
                                         else
                                             ((d, ind), island_flag)
                                     else
@@ -155,7 +157,7 @@ def removeIslands [grid_size] [n] (grid : [grid_size][grid_size](f64, i32)) (poi
                 )
             -- Check if any islands where found. If so we loop again!
             let cond' = trace <| or (island_flag_array)
-            in (unflatten g'', cond')
+            in (unflatten g', cond')
     in g''
 
 def locateVoronoiVertices [m] (grid : [m][m]i32) : [m-2][m-2]i32 = 
